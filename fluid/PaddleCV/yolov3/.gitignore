@@ -1,0 +1,11 @@
+output/
+checkpoints/
+dataset/
+!dataset/coco/*.sh
+weights/
+!weights/*.py
+!weights/*.sh
+*.swp
+*.log
+log*
+output*

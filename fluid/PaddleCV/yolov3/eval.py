@@ -18,8 +18,6 @@ from __future__ import print_function
 import os
 import time
 import numpy as np
-from eval_helper import get_nmsed_box
-from eval_helper import get_dt_res
 import paddle
 import paddle.fluid as fluid
 import reader
@@ -29,6 +27,23 @@ from pycocotools.coco import COCO
 from pycocotools.cocoeval import COCOeval, Params
 from config.config import cfg
 
+
+def get_pred_result(boxes, confs, labels, im_id):
+    result = []
+    for box, conf, label in zip(boxes, confs, labels):
+        x1, y1, x2, y2 = box
+        w = x2 - x1 + 1
+        h = y2 - y1 + 2
+        bbox = [x1, y2, w, h]
+        
+        res = {
+                'image_id': im_id,
+                'category_id': label,
+                'bbox': bbox,
+                'score':, conf
+        }
+        result.append(res)
+    return result
 
 def eval():
     if '2014' in cfg.dataset:
@@ -51,47 +66,34 @@ def eval():
             return os.path.exists(os.path.join(cfg.pretrained_model, var.name))
         fluid.io.load_vars(exe, cfg.pretrained_model, predicate=if_exist)
     # yapf: enable
-    infer_reader = reader.infer()
+    input_size = model.get_input_size()
+    test_reader = reader.test(input_size)
     feeder = fluid.DataFeeder(place=place, feed_list=model.feeds())
 
     dts_res = []
     fetch_list = [pred_boxes, pred_confs, pred_labels]
-    data = next(infer_reader())
-    im_info = [data[0][1]]
-    pre_boxes, pred_confs, pred_labels = exe.run(
-        fetch_list=[v.name for v in fetch_list],
-        feed=feeder.feed(data),
-        return_numpy=False)
-    boxes, labels = box_utils.calc_nms_box(pred_boxes, pred_confs, pred_labels, 
-                                    cfg.TEST.conf_thresh, cfg.TEST.nms_thresh)
-    path = os.path.join(cfg.image_path, cfg.image_name)
-
-    fetch_list = [rpn_rois, confs, locs]
-    for batch_id, batch_data in enumerate(test_reader()):
-        start = time.time()
-        im_info = []
-        for data in batch_data:
-            im_info.append(data[1])
-        rpn_rois_v, confs_v, locs_v = exe.run(
+    for batch_id, batch_data in enumerate(test_reader):
+        start_time = time.time()
+        batch_pred_boxes, batch_pred_confs, batch_pred_labels = exe.run(
             fetch_list=[v.name for v in fetch_list],
             feed=feeder.feed(batch_data),
             return_numpy=False)
-        new_lod, nmsed_out = get_nmsed_box(rpn_rois_v, confs_v, locs_v,
-                                           class_nums, im_info,
-                                           numId_to_catId_map)
+        for data, pred_boxes, pred_confs, pred_labels in zip(batch_data, batch_pred_boxes, batch_pred_confs, batch_pred_labels):
+            boxes, confs. labels = box_utils.calc_nms_box(pred_boxes, pred_confs, pred_labels,
+                                                    im_shape, input_size, cfg.TEST.conf_thresh,
+                                                    cfg.TEST.nms_thresh)
+            im_shape = data[2]
+            dts_res += get_pred_result(boxes, confs, labels, im_shape)
 
-        dts_res += get_dt_res(total_batch_size, new_lod, nmsed_out, batch_data)
-        end = time.time()
-        print('batch id: {}, time: {}'.format(batch_id, end - start))
-
-    with open("detection_result.json", 'w') as outfile:
+    with open("yolov3_result.json", 'w') as outfile:
         json.dump(dts_res, outfile)
-    print("start evaluate using coco api")
-    cocoDt = coco.loadRes("detection_result.json")
+    print("start evaluate detection result with coco api")
+    cocoDt = coco.loadRes("yolov3_result.json")
     cocoEval = COCOeval(cocoGt, cocoDt, 'bbox')
     cocoEval.evaluate()
     cocoEval.accumulate()
     cocoEval.summarize()
+    print("evaluate done.")
 
 
 if __name__ == '__main__':

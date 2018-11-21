@@ -1,9 +1,6 @@
 import os
 import time
 import numpy as np
-from eval_helper import get_nmsed_box
-from eval_helper import get_dt_res
-from eval_helper import draw_bounding_box_on_image
 import paddle
 import paddle.fluid as fluid
 import reader
@@ -37,7 +34,8 @@ def infer():
             return os.path.exists(os.path.join(cfg.pretrained_model, var.name))
         fluid.io.load_vars(exe, cfg.pretrained_model, predicate=if_exist)
     # yapf: enable
-    infer_reader = reader.infer(model.get_input_size())
+    input_size = model.get_input_size()
+    infer_reader = reader.infer(input_size)
     feeder = fluid.DataFeeder(place=place, feed_list=model.feeds())
 
     fetch_list = [pred_boxes, pred_confs, pred_labels]
@@ -47,7 +45,7 @@ def infer():
         fetch_list=[v.name for v in fetch_list],
         feed=feeder.feed(data),
         return_numpy=False)
-    boxes, _, labels = box_utils.calc_nms_box(pred_boxes, pred_confs, pred_labels, 
+    boxes, _, labels = box_utils.calc_nms_box(pred_boxes[0], pred_confs[0], pred_labels[0], 
                                     im_shape, input_size, cfg.TEST.conf_thresh, 
                                     cfg.TEST.nms_thresh)
     path = os.path.join(cfg.image_path, cfg.image_name)

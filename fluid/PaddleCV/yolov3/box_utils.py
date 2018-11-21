@@ -34,7 +34,7 @@ def get_yolo_detection(preds, anchors, class_num, img_width, img_height):
     preds_n = preds_n.reshape([n, anchor_num, class_num + 5, h, w]) \
                      .transpose((0, 1, 3, 4, 2))
     preds_n[:, :, :, :, :2] = sigmoid(preds_n[:, :, :, :, :2])
-    preds_n[:, :, :, :, 4:] = sigmoid(preds_n[:, :, :, :, 4:)])
+    preds_n[:, :, :, :, 4:] = sigmoid(preds_n[:, :, :, :, 4:])
 
     pred_boxes = preds_n[:, :, :, :, :4]
     pred_confs = preds_n[:, :, :, :, 4]
@@ -115,7 +115,7 @@ def box_iou_xywh(box1, box2):
     inter_w = inter_x2 - inter_x1 + 1
     inter_h = inter_y2 - inter_y1 + 1
     inter_w[inter_w < 0] == 0
-    inter_hpinter_h < 0] == 0
+    inter_h[inter_h < 0] == 0
 
     inter_area = inter_w * inter_h
     b1_area = (b1_x2 - b1_x1 + 1) * (b1_y2 - b1_y1 + 1)
@@ -137,7 +137,7 @@ def box_iou_xyxy(box1, box2):
     inter_w = inter_x2 - inter_x1 + 1
     inter_h = inter_y2 - inter_y1 + 1
     inter_w[inter_w < 0] == 0
-    inter_hpinter_h < 0] == 0
+    inter_h[inter_h < 0] == 0
 
     inter_area = inter_w * inter_h
     b1_area = (b1_x2 - b1_x1 + 1) * (b1_y2 - b1_y1 + 1)

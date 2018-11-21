@@ -20,33 +20,34 @@ LAYER_TYPES = [
         "shortcut",
         "route",
         "upsample",
-        "max_pool",
+        "maxpool",
         "yolo",
         ]
 
 class ConfigPaser(object):
-  
-  def __init__(self, config_path):
-    self.config_path = config_path
+    def __init__(self, config_path):
+        self.config_path = config_path
+    
+    def parse(self):
+        with open(self.config_path) as cfg_file:
+            model_defs = []
+            for line in cfg_file.readlines():
+                line = line.strip()
+                if len(line) == 0:
+                    continue
+                if line.startswith('#'):
+                    continue
+                if line.startswith('['):
+                    layer_type = line[1:-1].strip()
+                    if layer_type not in LAYER_TYPES:
+                        print("Unknow config layer type: ", layer_type)
+                        return None
+                    model_defs.append({})
+                    model_defs[-1]['type'] = layer_type
+                else:
+                    key, value = line.split('=')
+                    model_defs[-1][key.strip()] = value.strip()
 
-  def parse(self):
-    with open(self.config_path) as cfg_file:
-      model_defs = []
-      for line in cfg_file.readlines():
-        line = line.strip()
-        if line.startwith('#'):
-          continue
-        if line.startwith('['):
-            layer_type = line[1:-1].strip()
-            if layer_type not iin LAYER_TYPES:
-                print("Unknow config layer type!")
-                return None
-            model_defs.append({})
-            model_defs[-1]['type'] = line[layer_type]
-        else:
-            key, value = line.split('=')
-            model_defs[-1][key.strip()] = value.strip()
-
-    return model_defs
+        return model_defs
 
 

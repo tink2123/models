@@ -26,7 +26,7 @@ from collections import deque
 from paddle.fluid import core
 import argparse
 import functools
-from config import *
+from config.config import *
 
 
 def print_arguments(args):
@@ -96,11 +96,11 @@ def parse_args():
     add_arg('use_gpu',          bool,  True,      "Whether use GPU.")
     add_arg('model_cfg_path',   str,    './config/yolov3.cfg', "YOLO model config file path.")
     add_arg('model_save_dir',   str,    'output',     "The path to save model.")
-    add_arg('pretrained_model', str,    'imagenet_resnet50_fusebn', "The init model path.")
+    add_arg('pretrained_model', str,    './weights/darknet53', "The init model path.")
     add_arg('dataset',          str,   'coco2014',  "coco2014, coco2017.")
     add_arg('class_num',        int,   80,          "Class number.")
-    add_arg('data_dir',         str,   'data/COCO14',        "The data root path.")
-    add_arg('use_pyreader',     bool,   True,           "Use pyreader.")
+    add_arg('data_dir',         str,   'data/coco',        "The data root path.")
+    add_arg('use_pyreader',     bool,   False,           "Use pyreader.")
     add_arg('use_profile',         bool,   False,       "Whether use profiler.")
     #SOLVER
     add_arg('learning_rate',    float,  0.01,     "Learning rate.")
@@ -114,8 +114,8 @@ def parse_args():
     add_arg('snapshot_stride',  int,    10000,    "save model every snapshot stride.")
     add_arg('debug',            bool,   False,   "Debug mode")
     # SINGLE EVAL AND DRAW
-    add_arg('image_path',       str,   'data/COCO14/val2014',  "The image path used to inference and visualize.")
-    add_arg('image_name',        str,    '',       "The single image used to inference and visualize.")
+    add_arg('image_path',       str,   'image',  "The image path used to inference and visualize.")
+    add_arg('image_name',        str,    'dog.jpg',       "The single image used to inference and visualize.")
     # yapf: enable
     args = parser.parse_args()
     file_name = sys.argv[0]

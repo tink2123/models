@@ -25,31 +25,34 @@ import box_utils
 from config.config_parser import ConfigPaser
 
 
-def conv_affine_layer(input,
+def conv_bn_layer(input,
                       ch_out,
                       filter_size,
                       stride,
                       padding,
-                      act='relu',
-                      bn=False
-                      name=None):
-    out = fluid.layers.conv2d(
-        input=input,
-        num_filters=ch_out,
-        filter_size=filter_size,
-        stride=stride,
-        padding=padding,
-        act=None,
-        param_attr=ParamAttr(name=name + "_weights"),
-        bias_attr=False,
-        name=name + '.conv2d.output.1')
-
+                      act=None,
+                      bn=False,
+                      name=None,
+                      is_train=True):
     if bn:
+        out = fluid.layers.conv2d(
+            input=input,
+            num_filters=ch_out,
+            filter_size=filter_size,
+            stride=stride,
+            padding=padding,
+            act=None,
+            param_attr=ParamAttr(initializer=fluid.initializer.Normal(0, 0.02),
+                                 name=name + "_weights"),
+            bias_attr=False,
+            name=name + '.conv2d.output.1')
+
         bn_name = "bn" + name[3:]
         scale = fluid.layers.create_parameter(
             shape=[out.shape[1]],
             dtype=out.dtype,
             attr=ParamAttr(
+                initializer=fluid.initializer.Normal(0, 0.02),
                 name=bn_name + '_scale', learning_rate=0.),
             default_initializer=Constant(1.))
         scale.stop_gradient = True
@@ -57,16 +60,39 @@ def conv_affine_layer(input,
             shape=[out.shape[1]],
             dtype=out.dtype,
             attr=ParamAttr(
-                bn_name + '_offset', learning_rate=0.),
-            default_initializer=Constant(0.))
+                initializer=fluid.initializer.Constant(0.0),
+                name=bn_name + '_offset', learning_rate=0.),
+                default_initializer=Constant(0.))
         bias.stop_gradient = True
 
-        out = fluid.layers.affine_channel(x=out, scale=scale, bias=bias)
+        if act == "leaky":
+            act = "leaky-relu"
 
-    if act == 'relu':
-        out = fluid.layers.relu(x=out)
-    if act == 'leaky':
-        out = fluid.layers.leaky_relu(x=out)
+        out = fluid.layers.batch_norm(input=out, 
+                                      act=act, 
+                                      is_test=not is_train,
+                                      param_attr=scale,
+                                      bias_attr=bias,
+                                      moving_mean_name=bn_name+'_mean',
+                                      moving_variance_name=bn_name+'_var',
+                                      name=bn_name+'.output')
+    else:
+        out = fluid.layers.conv2d(
+            input=input,
+            num_filters=ch_out,
+            filter_size=filter_size,
+            stride=stride,
+            padding=padding,
+            act=None,
+            param_attr=ParamAttr(initializer=fluid.initializer.Normal(0, 0.02),
+                                 name=name + "_weights"),
+            bias_attr=ParamAttr(initializer=fluid.initializer.Constant(0.0),
+                                 name=name + "_bias"),
+            name=name + '.conv2d.output.1')
+        if act == 'relu':
+            out = fluid.layers.relu(x=out)
+        if act == 'leaky':
+            out = fluid.layers.leaky_relu(x=out)
     return out
 
 
@@ -84,12 +110,12 @@ class YOLOv3(object):
         self.outputs = []
         self.losses = []
 
-    def build_model(self, self.image):
+    def build_model(self):
         model_defs = self.config_parser.parse()
         if model_defs is None:
             return None
 
-        self.hyperparams = model_defs.pop(0)
+        self.hyperparams = model_defs.pop()
         assert self.hyperparams['type'].lower() == "net", \
                 "net config params should be given in the first segment named 'net'"
         self.img_height = self.hyperparams['height']
@@ -110,14 +136,15 @@ class YOLOv3(object):
                 stride = int(layer_def['stride'])
                 padding = (size - 1) // 2 if int(layer_def['pad']) else 0
                 act = layer_def['activation']
-                out = conv_affine_layer(
+                out = conv_bn_layer(
                         ch_out=ch_out,
-                        filter_size=filter_size
-                        stride=stride
-                        padding=padding
+                        filter_size=filter_size,
+                        stride=stride,
+                        padding=padding,
                         act=act,
-                        bn=bool(bn)
-                        name="conv"+str(i))
+                        bn=bool(bn),
+                        name="conv"+str(i),
+                        is_train=self.is_train)
 
             elif layer_def['type'] == 'shortcut':
                 layer_from = int(layer_def['from'])
@@ -171,7 +198,7 @@ class YOLOv3(object):
                             gtlabel=self.gtlabel,
                             anchors=anchors,
                             class_num=class_num,
-                            ignore_thresh=ignore_thresh
+                            ignore_thresh=ignore_thresh,
                             name="yolo_loss"+str(i))
                     self.losses.append(loss)
 
@@ -198,9 +225,9 @@ class YOLOv3(object):
             all_pred_labels.append(pred_labels)
 
         return (
-            fluid.layers.concat(all_pred_boxes, axis=1)
-            fluid.layers.concat(all_pred_confs, axis=1)
-            fluid.layers.concat(all_pred_labels, axis=1)
+            fluid.layers.concat(all_pred_boxes, axis=1),
+            fluid.layers.concat(all_pred_confs, axis=1),
+            fluid.layers.concat(all_pred_labels, axis=1),
             )
 
     def build_input(self):
@@ -219,7 +246,7 @@ class YOLOv3(object):
         if not self.is_train:
             return [self.image]
         return [self.image, self.gtbox, self.gtlabel]
-    
+
     def get_hyperparams(self):
         return self.hyperparams
 

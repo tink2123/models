@@ -92,7 +92,8 @@ def train():
     #         shuffle=True)
     #     py_reader = model.py_reader
     #     py_reader.decorate_paddle_reader(train_reader)
-    train_reader = reader.train(batch_size=cfg.TRAIN.im_per_batch, shuffle=True)
+    input_size = model.get_input_size()
+    train_reader = reader.train(input_size, batch_size=cfg.TRAIN.im_per_batch, shuffle=True)
     feeder = fluid.DataFeeder(place=place, feed_list=model.feeds())
 
     def save_model(postfix):

@@ -36,7 +36,7 @@ from config.config import cfg
 class DataSetReader(object):
     """A class for parsing and read COCO dataset"""
 
-    def _parse_dataset_dir(self, mode)
+    def _parse_dataset_dir(self, mode):
         if 'coco2014' in cfg.dataset:
             cfg.train_file_list = 'annotations/instances_train2014.json'
             cfg.train_data_dir = 'train2014'
@@ -93,8 +93,8 @@ class DataSetReader(object):
                 continue
 
             img['gt_id'] = np.append(img['gt_id'], np.int32(target['id']))
-            img['gt_boxes'] = np.append[img['gt_boxes'], axis=0]
-            img['gt_labels'] = np.append([img['gt_labels'], self.category_to_id_map[target['category_id']]) 
+            img['gt_boxes'] = np.append(img['gt_boxes'], axis=0)
+            img['gt_labels'] = np.append(img['gt_labels'], self.category_to_id_map[target['category_id']]) 
 
     def _filter_imgs_by_valid_box(self, imgs):
         """Exclude images with no ground truth box"""
@@ -120,7 +120,7 @@ class DataSetReader(object):
             img['image'] = os.path.join(self.img_dir, img['file_name'])
             assert os.path.exists(img['image'])
             img['flipped'] = False
-            img['gt_id' = np.empty((0), dtype=np.int32)]
+            img['gt_id'] = np.empty((0), dtype=np.int32)
             img['gt_boxes'] = np.empty((0, 4), dtype=np.float32)
             img['gt_labels'] = np.empty((0), dtype=np.int32)
             for k in ['date_captured', 'url', 'license', 'file_name']:
@@ -225,13 +225,13 @@ class DataSetReader(object):
 
 dsr = DataSetReader()
 
-def train(size=416, batch_size, shuffle=True):
+def train(size, batch_size, shuffle=True):
     return dsr.get_reader('train', size, batch_size, shuffle)
 
 
-def test(size=416, batch_size, padding_total=False):
+def test(size, batch_size, padding_total=False):
     return dsr.get_reader('test', size, batch_size, shuffle)
 
 
-def infer(size=416):
+def infer(size):
     return dsr.get_reader('infer', size)
