@@ -30,7 +30,7 @@ def get_yolo_detection(preds, anchors, class_num, img_width, img_height):
     """Get yolo box, confidence score, class label from Darknet53 output"""
     preds_n = np.array(preds)
     n, c, h, w = preds_n.shape
-    anchor_num = len(anchors)
+    anchor_num = len(anchors) // 2
     preds_n = preds_n.reshape([n, anchor_num, class_num + 5, h, w]) \
                      .transpose((0, 1, 3, 4, 2))
     preds_n[:, :, :, :, :2] = sigmoid(preds_n[:, :, :, :, :2])
@@ -40,22 +40,44 @@ def get_yolo_detection(preds, anchors, class_num, img_width, img_height):
     pred_confs = preds_n[:, :, :, :, 4]
     pred_classes = preds_n[:, :, :, :, 5:]
 
-    grid_x = np.tile(np.arange(h).reshape((h, 1)), (1, w))
-    grid_y = np.tile(np.arange(w).reshape((1, w)), (h, 1))
-    anchors_s = np.arrray([(an_w * w / img_width, an_h * h / img_height) for an_w, an_h in anchors])
-    anchors_w = anchors_s[:, 0:1].reshape((1, anchor_num, 1, 1))
-    anchors_h = anchors_s[:, 1:2].reshape((1, anchor_num, 1, 1))
+    grid_x = np.tile(np.arange(w).reshape((1, w)), (h, 1))
+    grid_y = np.tile(np.arange(h).reshape((h, 1)), (1, w))
+    anchors = [(anchors[i], anchors[i+1]) for i in range(0, len(anchors), 2)]
+    anchors_s = np.array([(an_w * w / img_width, an_h * h / img_height) for an_w, an_h in anchors])
+    anchor_w = anchors_s[:, 0:1].reshape((1, anchor_num, 1, 1))
+    anchor_h = anchors_s[:, 1:2].reshape((1, anchor_num, 1, 1))
 
     pred_boxes[:, :, :, :, 0] += grid_x
     pred_boxes[:, :, :, :, 1] += grid_y
     pred_boxes[:, :, :, :, 2] = np.exp(pred_boxes[:, :, :, :, 2]) * anchor_w
-    pred_boxes[:, :, :, :, 3] = np.exp(pred_boxes[:, :, :, :, 2]) * anchor_h
+    pred_boxes[:, :, :, :, 3] = np.exp(pred_boxes[:, :, :, :, 3]) * anchor_h
 
     return (
-            pred_boxes.reshape((n, -1, 4)), 
+            pred_boxes.reshape((n, -1, 4)) * img_width / w, 
             pred_confs.reshape((n, -1)), 
             pred_classes.reshape((n, -1, class_num))
             )
+
+def get_all_yolo_pred(outputs, yolo_anchors, yolo_classes, input_shape):    
+    all_pred_boxes = []
+    all_pred_confs = []
+    all_pred_labels = []
+    for output, anchors, classes in zip(outputs, yolo_anchors, yolo_classes):
+        pred_boxes, pred_confs, pred_labels = get_yolo_detection(output, anchors, classes, input_shape[0], input_shape[1])
+        preds = np.concatenate([pred_boxes, np.expand_dims(pred_confs, 2)], axis=2)
+        # f = open("output{}.txt".format(index), 'w')
+        # f.write(str(preds.shape) + "\n")
+        # f.write(str(preds))
+        # f.close()
+        # index += 1
+        all_pred_boxes.append(pred_boxes)
+        all_pred_confs.append(pred_confs)
+        all_pred_labels.append(pred_labels)
+    pred_boxes = np.concatenate(all_pred_boxes, axis=1)
+    pred_confs = np.concatenate(all_pred_confs, axis=1)
+    pred_labels = np.concatenate(all_pred_labels, axis=1)
+
+    return (pred_boxes, pred_confs, pred_labels)
 
 def coco_anno_box_to_center_relative(box, img_width, img_height):
     """
@@ -94,8 +116,8 @@ def box_xywh_to_xyxy(box):
     assert shape[-1] == 4, "Box shape[-1] should be 4."
 
     box = box.reshape((-1, 4))
-    box[:, 0], box[:, 2] = box[: 0] - box[:, 2] / 2, box[:, 0] + box[:, 2] / 2
-    box[:, 1], box[:, 3] = box[: 1] - box[:, 3] / 2, box[:, 1] + box[:, 3] / 2
+    box[:, 0], box[:, 2] = box[:, 0] - box[:, 2] / 2, box[:, 0] + box[:, 2] / 2
+    box[:, 1], box[:, 3] = box[:, 1] - box[:, 3] / 2, box[:, 1] + box[:, 3] / 2
     box = box.reshape(shape)
     return box
 
@@ -148,29 +170,28 @@ def box_iou_xyxy(box1, box2):
 def rescale_box_in_input_image(boxes, im_shape, input_size):
     """Scale (x1, x2, y1, y2) box of yolo output to input image"""
     h, w = im_shape
-    boxes = boxes * h / input_size
+    max_dim = max(h , w)
+    boxes = boxes * max_dim / input_size
     dim_diff = np.abs(h - w)
     pad = dim_diff // 2
-    pad = ((pad1, pad2), (0, 0), (0, 0)) if h <= w else ((0, 0), (pad1, pad2), (0, 0))
     if h <= w:
-        box[:, 1] -= pad
-        box[:, 3] -= pad
+        boxes[:, 1] -= pad
+        boxes[:, 3] -= pad
     else:
-        box[:, 0] -= pad
-        box[:, 2] -= pad
-    return box
+        boxes[:, 0] -= pad
+        boxes[:, 2] -= pad
+    return boxes
 
-def calc_nms_box(pred_boxes, pred_confs, pred_labels, im_shape, input_size, conf_thresh=0.5, nms_thresh=0.4):
+def calc_nms_box(pred_boxes, pred_confs, pred_labels, im_shape, input_size, conf_thresh=0.8, nms_thresh=0.4):
     """
     Removes detections which confidence score under conf_thresh and perform 
     Non-Maximun Suppression to filtered boxes
     """
-    n, box_num, class_num = pred_labels_n.shape
+    _, box_num, class_num = pred_labels.shape
     pred_boxes = box_xywh_to_xyxy(pred_boxes)
-    pred_boxes = rescale_box_in_input_image(pred_boxes, im_shape, input_size)
-    output_boxes = [np.empty((0, 4)) for _ in range(n)]
-    output_confs = [np.empty(0) for _ in range(n)]
-    output_labels = [np.empty((0)) for _ in range(n)]
+    output_boxes = np.empty((0, 4))
+    output_confs = np.empty(0)
+    output_labels = np.empty((0))
     for i, (boxes, confs, classes) in enumerate(zip(pred_boxes, pred_confs, pred_labels)):
         conf_mask = confs > conf_thresh
         if conf_mask.sum() == 0:
@@ -186,7 +207,7 @@ def calc_nms_box(pred_boxes, pred_confs, pred_labels, im_shape, input_size, conf
             c_confs = confs[c_mask]
             c_boxes = boxes[c_mask]
             c_scores = cls_score[c_mask]
-            c_score_index = np.argsort(cls_score)
+            c_score_index = np.argsort(c_scores)
             c_boxes_s = c_boxes[c_score_index[::-1]]
             c_confs_s = c_confs[c_score_index[::-1]]
 
@@ -200,28 +221,25 @@ def calc_nms_box(pred_boxes, pred_confs, pred_labels, im_shape, input_size, conf
                 if c_boxes_s.shape[0] == 1:
                     break
                 iou = box_iou_xyxy(detect_boxes[-1].reshape((1, 4)), c_boxes_s[1:])
-                c_boxes_s = c_boxes_s[1:][ious < nms_thresh]
-                c_confs_s = c_confs_s[1:][ious < nms_thresh]
+                c_boxes_s = c_boxes_s[1:][iou < nms_thresh]
+                c_confs_s = c_confs_s[1:][iou < nms_thresh]
 
             output_boxes = np.append(output_boxes, detect_boxes, axis=0)
             output_confs = np.append(output_confs, detect_confs)
             output_labels = np.append(output_labels, detect_labels)
 
+    output_boxes = rescale_box_in_input_image(output_boxes, im_shape, input_size)
     return (output_boxes, output_confs, output_labels)
 
 def draw_boxes_on_image(image_path, boxes, labels, label_names):
     image = Image.open(image_path)
     draw = ImageDraw.Draw(image)
-    w, h = image.size
-    dim_diff = np.abs(h - w)
-    pad1, pad2 = dim_diff // 2, dim_diff - dim_diff // 2
-    pad = ((pad1, pad2), (0, 0), (0, 0)) if h <= w else ((0, 0), (pad1, pad2), (0, 0))
 
     for box, label in zip(boxes, labels):
         x1, y1, x2, y2 = box[0], box[1], box[2], box[3]
         # x1, x2 = box[0] - box[2] / 2, box[0] + box[2] / 2
         # y1, y2 = box[1] - box[3] / 2, box[1] + box[3] / 2
-        draw.rectangle((x1, y1, x2, y2), width=2, outline='red')
+        draw.rectangle((x1, y1, x2, y2), outline='red')
         if image.mode == 'RGB':
             draw.text((x1, y1), label_names[int(label)], (255, 255, 0))
     image_name = image_path.split('/')[-1]

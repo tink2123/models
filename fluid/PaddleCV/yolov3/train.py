@@ -27,12 +27,10 @@ import paddle
 import paddle.fluid as fluid
 import reader
 import models
-from config import cfg
+from config.config import cfg
 
 
 def train():
-    learning_rate = cfg.learning_rate
-    image_shape = [3, cfg.TRAIN.max_size, cfg.TRAIN.max_size]
 
     if cfg.debug:
         fluid.default_startup_program().random_seed = 1000
@@ -44,27 +42,14 @@ def train():
     # devices_num = len(devices.split(","))
     # total_batch_size = devices_num * cfg.TRAIN.im_per_batch
 
-    batch_size = cfg.TRAIN.im_per_batch
-
-    model = models.YOLOv3(cfg.TRAIN.modle_cfg_path)
-    model.build_model(image_shape)
+    model = models.YOLOv3(cfg.model_cfg_path)
+    model.build_model()
     loss = model.loss()
     loss.persistable = True
 
-    boundaries = cfg.lr_steps
-    gamma = cfg.lr_gamma
-    step_num = len(cfg.lr_steps)
-    values = [learning_rate * (gamma**i) for i in range(step_num + 1)]
-
-    optimizer = fluid.optimizer.Momentum(
-        learning_rate=exponential_with_warmup_decay(
-            learning_rate=learning_rate,
-            boundaries=boundaries,
-            values=values,
-            warmup_iter=cfg.warm_up_iter,
-            warmup_factor=cfg.warm_up_factor),
-        regularization=fluid.regularizer.L2Decay(cfg.weight_decay),
-        momentum=cfg.momentum)
+    hyperparams = model.get_hyperparams()
+    learning_rate = float(hyperparams['learning_rate'])
+    optimizer = fluid.optimizer.Adam(learning_rate=learning_rate)
     optimizer.minimize(loss)
 
     fluid.memory_optimize(fluid.default_main_program())
@@ -72,12 +57,11 @@ def train():
     place = fluid.CUDAPlace(0) if cfg.use_gpu else fluid.CPUPlace()
     exe = fluid.Executor(place)
     exe.run(fluid.default_startup_program())
+    # fluid.io.save_persistables(exe, "./test")
 
     if cfg.pretrained_model:
-
         def if_exist(var):
             return os.path.exists(os.path.join(cfg.pretrained_model, var.name))
-
         fluid.io.load_vars(exe, cfg.pretrained_model, predicate=if_exist)
 
     if cfg.parallel:

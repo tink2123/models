@@ -23,17 +23,18 @@ from paddle.fluid.regularizer import L2Decay
 
 import box_utils
 from config.config_parser import ConfigPaser
+from config.config import cfg
 
 
 def conv_bn_layer(input,
-                      ch_out,
-                      filter_size,
-                      stride,
-                      padding,
-                      act=None,
-                      bn=False,
-                      name=None,
-                      is_train=True):
+                  ch_out,
+                  filter_size,
+                  stride,
+                  padding,
+                  act=None,
+                  bn=False,
+                  name=None,
+                  is_train=True):
     if bn:
         out = fluid.layers.conv2d(
             input=input,
@@ -42,40 +43,30 @@ def conv_bn_layer(input,
             stride=stride,
             padding=padding,
             act=None,
-            param_attr=ParamAttr(initializer=fluid.initializer.Normal(0, 0.02),
+            param_attr=ParamAttr(initializer=fluid.initializer.Normal(0., 0.02),
+            # param_attr=ParamAttr(initializer=fluid.initializer.Constant(1.0),
                                  name=name + "_weights"),
             bias_attr=False,
             name=name + '.conv2d.output.1')
 
-        bn_name = "bn" + name[3:]
-        scale = fluid.layers.create_parameter(
-            shape=[out.shape[1]],
-            dtype=out.dtype,
-            attr=ParamAttr(
-                initializer=fluid.initializer.Normal(0, 0.02),
-                name=bn_name + '_scale', learning_rate=0.),
-            default_initializer=Constant(1.))
-        scale.stop_gradient = True
-        bias = fluid.layers.create_parameter(
-            shape=[out.shape[1]],
-            dtype=out.dtype,
-            attr=ParamAttr(
-                initializer=fluid.initializer.Constant(0.0),
-                name=bn_name + '_offset', learning_rate=0.),
-                default_initializer=Constant(0.))
-        bias.stop_gradient = True
-
-        if act == "leaky":
-            act = "leaky-relu"
+        bn_name = "bn" + name[4:]
 
         out = fluid.layers.batch_norm(input=out, 
-                                      act=act, 
+                                      act=None, 
                                       is_test=not is_train,
-                                      param_attr=scale,
-                                      bias_attr=bias,
+                                      param_attr=ParamAttr(
+                                            initializer=fluid.initializer.Normal(0., 0.02),
+                                            # initializer=fluid.initializer.Constant(2.0),
+                                            name=bn_name + '_scale'),
+                                      bias_attr=ParamAttr(
+                                            initializer=fluid.initializer.Constant(0.0),
+                                            # initializer=fluid.initializer.Constant(3.0),
+                                            name=bn_name + '_offset'),
                                       moving_mean_name=bn_name+'_mean',
                                       moving_variance_name=bn_name+'_var',
                                       name=bn_name+'.output')
+        if act == "leaky":
+            out = fluid.layers.leaky_relu(x=out, alpha=0.1)
     else:
         out = fluid.layers.conv2d(
             input=input,
@@ -84,9 +75,11 @@ def conv_bn_layer(input,
             stride=stride,
             padding=padding,
             act=None,
-            param_attr=ParamAttr(initializer=fluid.initializer.Normal(0, 0.02),
+            param_attr=ParamAttr(initializer=fluid.initializer.Normal(0., 0.02),
+            # param_attr=ParamAttr(initializer=fluid.initializer.Constant(1.0),
                                  name=name + "_weights"),
             bias_attr=ParamAttr(initializer=fluid.initializer.Constant(0.0),
+            # bias_attr=ParamAttr(initializer=fluid.initializer.Constant(4.0),
                                  name=name + "_bias"),
             name=name + '.conv2d.output.1')
         if act == 'relu':
@@ -115,7 +108,7 @@ class YOLOv3(object):
         if model_defs is None:
             return None
 
-        self.hyperparams = model_defs.pop()
+        self.hyperparams = model_defs.pop(0)
         assert self.hyperparams['type'].lower() == "net", \
                 "net config params should be given in the first segment named 'net'"
         self.img_height = self.hyperparams['height']
@@ -126,17 +119,20 @@ class YOLOv3(object):
         out = self.image
         layer_outputs = []
         self.yolo_layer_defs = []
+        self.yolo_anchors = []
+        self.yolo_classes = []
         self.outputs = []
         self.losses = []
         for i, layer_def in enumerate(model_defs):
             if layer_def['type'] == 'convolutional':
-                bn = int(layer_def['batch_normalize'])
+                bn = layer_def.get('batch_normalize', 0)
                 ch_out = int(layer_def['filters'])
                 filter_size = int(layer_def['size'])
                 stride = int(layer_def['stride'])
-                padding = (size - 1) // 2 if int(layer_def['pad']) else 0
+                padding = (filter_size - 1) // 2 if int(layer_def['pad']) else 0
                 act = layer_def['activation']
                 out = conv_bn_layer(
+                        input=out,
                         ch_out=ch_out,
                         filter_size=filter_size,
                         stride=stride,
@@ -183,15 +179,18 @@ class YOLOv3(object):
                 self.yolo_layer_defs.append(layer_def)
                 self.outputs.append(out)
 
-                if is_train:
-                    anchor_idxs = map(int, layer_def['mask'].split(','))
-                    all_anchors = map(float, layer_def['anchors'].split(','))
-                    anchors = []
-                    for anchor_idx in anchor_idxs:
-                        anchors.append(all_anchors[anchor_idx * 2])
-                        anchors.append(all_anchors[anchor_idx * 2 + 1])
-                    class_num = layer_def['class_num']
-                    ignore_thresh = layer_def['ignore_thresh']
+                anchor_idxs = map(int, layer_def['mask'].split(','))
+                all_anchors = map(int, layer_def['anchors'].split(','))
+                anchors = []
+                for anchor_idx in anchor_idxs:
+                    anchors.append(all_anchors[anchor_idx * 2])
+                    anchors.append(all_anchors[anchor_idx * 2 + 1])
+                self.yolo_anchors.append(anchors)
+                class_num = int(layer_def['classes'])
+                self.yolo_classes.append(class_num)
+
+                if self.is_train:
+                    ignore_thresh = float(layer_def['ignore_thresh'])
                     loss = fluid.layers.yolov3_loss(
                             x=out,
                             gtbox=self.gtbox,
@@ -208,44 +207,59 @@ class YOLOv3(object):
         return sum(self.losses)
 
     def get_pred(self):
-        all_pred_boxes = []
-        all_pred_confs = []
-        all_pred_labels = []
-        for layer_def, output in zip(self.yolo_layer_defs, self.outputs):
-            class_num = layer_def['class_num']
-            all_anchors = map(float, layer_def['anchors'].split(','))
-            anchor_idxs = map(int, layer_def['mask'].split(','))
-            anchors = [[] for _ in range(len(anchor_idxs))]
-            for i, anchor_idx in enumerate(anchor_idxs):
-                anchors[i].append(all_anchors[anchor_idx * 2])
-                anchors[i].append(all_anchors[anchor_idx * 2 + 1])
-            pred_boxes, pred_confs, pred_labels = box_utils.get_yolo_detection(output, anchors, class_num, self.img_width, self.img_height)
-            all_pred_boxes.append(pred_boxes)
-            all_pred_confs.append(pred_confs)
-            all_pred_labels.append(pred_labels)
+        return self.outputs
+    
+    def get_yolo_anchors(self):
+        return self.yolo_anchors
 
-        return (
-            fluid.layers.concat(all_pred_boxes, axis=1),
-            fluid.layers.concat(all_pred_confs, axis=1),
-            fluid.layers.concat(all_pred_labels, axis=1),
-            )
+    def get_yolo_classes(self):
+        return self.yolo_classes
+
+    # def get_pred(self):
+    #     all_pred_boxes = []
+    #     all_pred_confs = []
+    #     all_pred_labels = []
+    #     for layer_def, output in zip(self.yolo_layer_defs, self.outputs):
+    #         print(output)
+    #         class_num = layer_def['classes']
+    #         all_anchors = map(float, layer_def['anchors'].split(','))
+    #         anchor_idxs = map(int, layer_def['mask'].split(','))
+    #         anchors = [[] for _ in range(len(anchor_idxs))]
+    #         for i, anchor_idx in enumerate(anchor_idxs):
+    #             anchors[i].append(all_anchors[anchor_idx * 2])
+    #             anchors[i].append(all_anchors[anchor_idx * 2 + 1])
+    #         pred_boxes, pred_confs, pred_labels = box_utils.get_yolo_detection(output, anchors, class_num, self.img_width, self.img_height)
+    #         all_pred_boxes.append(pred_boxes)
+    #         all_pred_confs.append(pred_confs)
+    #         all_pred_labels.append(pred_labels)
+    #
+    #     return (
+    #         fluid.layers.concat(all_pred_boxes, axis=1),
+    #         fluid.layers.concat(all_pred_confs, axis=1),
+    #         fluid.layers.concat(all_pred_labels, axis=1),
+    #         )
 
     def build_input(self):
-        self.image_shape = (3, self.hyperparams['height'], self.hyperparams['width'])
+        self.image_shape = (3, int(self.hyperparams['height']), int(self.hyperparams['width']))
         self.image = fluid.layers.data(
                 name='image', shape=self.image_shape, dtype='float32'
                 )
         self.gtbox = fluid.layers.data(
-                name='gtbox', shape=[5], dtype='float32', lod_level=1
+                # name='gtbox', shape=[cfg.TRAIN.max_box_num, 4], dtype='float32', lod_level=1
+                name='gtbox', shape=[10, 4], dtype='float32', lod_level=1
                 )
         self.gtlabel = fluid.layers.data(
-                name='gtlabel', shape=[-1], dtype='int32', lod_level=1
+                name='gtlabel', shape=[10], dtype='int32', lod_level=1
                 )
+        self.im_shape = fluid.layers.data(
+                name="im_shape", shape=[2], dtype='int32')
+        self.im_id = fluid.layers.data(
+                name="im_id", shape=[1], dtype='int32')
     
     def feeds(self):
         if not self.is_train:
-            return [self.image]
-        return [self.image, self.gtbox, self.gtlabel]
+            return [self.image, self.im_id, self.im_shape]
+        return [self.image, self.gtbox, self.gtlabel, self.im_id, self.im_shape]
 
     def get_hyperparams(self):
         return self.hyperparams

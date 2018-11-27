@@ -22,6 +22,7 @@ from paddle.utils.image_util import *
 import random
 from PIL import Image
 from PIL import ImageDraw
+from skimage.transform import resize
 import numpy as np
 import os
 import time
@@ -65,10 +66,7 @@ class DataSetReader(object):
 
     def _parse_dataset_catagory(self):
         category_ids = self.COCO.getCatIds()
-        categories = [c['name'] for c in self.COCO.loadCats(category_ids)]
-        self.categories = []
-        for category in categories:
-            self.categories.append(categories.name)
+        self.categories = [c['name'] for c in self.COCO.loadCats(category_ids)]
         self.num_category = len(self.categories)
         self.category_to_id_map = {
             v: i
@@ -118,7 +116,8 @@ class DataSetReader(object):
         imgs = copy.deepcopy(self.COCO.loadImgs(image_ids))
         for img in imgs:
             img['image'] = os.path.join(self.img_dir, img['file_name'])
-            assert os.path.exists(img['image'])
+            assert os.path.exists(img['image']), \
+                    "image {} not found.".format(img['image'])
             img['flipped'] = False
             img['gt_id'] = np.empty((0), dtype=np.int32)
             img['gt_boxes'] = np.empty((0, 4), dtype=np.float32)
@@ -136,18 +135,19 @@ class DataSetReader(object):
 
         return imgs
 
-    def get_reader(self, mode, size=416, batch_size=None, shuffle=True):
+    def get_reader(self, mode, size=416, batch_size=None, shuffle=True, image=None):
         assert mode in ['train', 'test', 'infer'], "Unknow mode type!"
         if mode != 'infer':
             assert batch_size is not None, "batch size connot be None in mode {}".format(mode)
 
         self._parse_dataset_dir(mode)
         self._parse_dataset_catagory()
-        imgs = self._parse_images(is_train=(mode=='train'))
+        if mode != 'infer':
+            imgs = self._parse_images(is_train=(mode=='train'))
 
         def img_reader(img, mode, size):
             im_path = img['image']
-            im_shape = (img_size, img_size)
+            im_shape = (size, size)
             
             im = np.array(Image.open(img['image'])).astype('float32')
             if len(im.shape) != 3:
@@ -159,13 +159,13 @@ class DataSetReader(object):
             dim_diff = np.abs(h - w)
             pad1, pad2 = dim_diff // 2, dim_diff - dim_diff // 2
             pad = ((pad1, pad2), (0, 0), (0, 0)) if h <= w else ((0, 0), (pad1, pad2), (0, 0))
-            out_img = np.pad(im, pad, 'constant', constant_values=127.5) / 255.0
+            out_img = np.pad(im, pad, 'constant', constant_values=128.0) / 255.0
             padded_h, padded_w, _ = out_img.shape
-            out_img = resize(out_img, (img_size, img_size, 3), mode='reflect')
-            out_img = out_img.transpose(put_img, (2, 0, 1))
+            out_img = resize(out_img, (size, size, 3), mode='reflect')
+            out_img = out_img.transpose((2, 0, 1))
 
             if mode != 'train':
-                return (out_im, img['id'] (h, w))
+                return (out_img, img['id'], (h, w))
 
             gt_boxes = img['gt_boxes']
             gt_labels = img['gt_labels']
@@ -216,12 +216,21 @@ class DataSetReader(object):
                 if len(batch_out) != 0:
                     yield batch_out
             else:
-                for img in imgs:
-                    if cfg.image_name not in img['image']:
-                        continue
-                    im, im_id, im_shape = img_reader(img, mode, size)
-                    batch_out = [(im, im_id, im_shape)]
-                    yield batch_out
+                img = {}
+                img['image'] = image
+                img['id'] = 0
+                img['flipped'] = False
+                im, im_id, im_shape = img_reader(img, mode, size)
+                batch_out = [(im, im_id, im_shape)]
+                yield batch_out
+                # for img in imgs:
+                #     if cfg.image_name not in img['image']:
+                #         continue
+                #     im, im_id, im_shape = img_reader(img, mode, size)
+                #     batch_out = [(im, im_id, im_shape)]
+                #     yield batch_out
+
+        return reader
 
 dsr = DataSetReader()
 
@@ -229,9 +238,9 @@ def train(size, batch_size, shuffle=True):
     return dsr.get_reader('train', size, batch_size, shuffle)
 
 
-def test(size, batch_size, padding_total=False):
+def test(size, batch_size, shuffle=False):
     return dsr.get_reader('test', size, batch_size, shuffle)
 
 
-def infer(size):
-    return dsr.get_reader('infer', size)
+def infer(size, image):
+    return dsr.get_reader('infer', size, image=image)

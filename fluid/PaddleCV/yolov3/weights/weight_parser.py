@@ -20,6 +20,7 @@ from __future__ import unicode_literals
 import os
 import sys
 import shutil
+import glob
 import numpy as np
 
 sys.path.append("..")
@@ -40,7 +41,7 @@ class WeightParser(object):
         os.mkdir(self.save_dir)
         return self.save_dir
 
-    def parse_weight_to_fluid(self):
+    def parse_weight_to_separate_file(self):
         self.save_dir = self.init_dir()
         weights = np.fromfile(
                 open(self.weight_file, 'rb'),
@@ -104,10 +105,37 @@ class WeightParser(object):
 
         assert w_idx == weights.shape[0], "parse imcomplete"
 
+    def convert_file_to_fluid(self):
+        filenames = glob.glob(self.save_dir+"/*")
+        for filename in filenames:
+            src_filename = "./test/" + filename.split("/")[-1]
+            assert os.path.exists(src_filename)
+
+            with open(src_filename, 'rb') as f:
+                src_data = f.read()
+            with open(filename, 'rb') as f:
+                data = f.read()
+            head_len = len(src_data) - len(data)
+            with open(filename, 'wb') as f:
+                f.write(src_data[:head_len])
+                f.write(data)
+
+    def check_conver_result(self):
+        filenames = glob.glob(self.save_dir+"/*")
+        for filename in filenames:
+            src_filename = "./test/" + filename.split("/")[-1]
+            assert os.path.exists(src_filename)
+
+            f = np.fromfile(open(filename, 'rb'), dtype=np.int8)
+            sf = np.fromfile(open(src_filename, 'rb'), dtype=np.int8)
+
+            assert f.shape == sf.shape, "check {} failed {}, {}".format(filename, f.shape, sf.shape)
+
+
 if __name__ == "__main__":
     model = sys.argv[1]
     if model == "pretrain":
-        weight_path = "darknet53.conv"
+        weight_path = "darknet53.pretrain"
         cfg_path = "../config/yolov3.cfg"
         conv_num = 53 - 1
     else:
@@ -119,5 +147,7 @@ if __name__ == "__main__":
             print(path, "not found!")
             exit()
     wp = WeightParser(weight_path, cfg_path, model, conv_num)
-    wp.parse_weight_to_fluid()
+    wp.parse_weight_to_separate_file()
+    wp.convert_file_to_fluid()
+    wp.check_conver_result()
 

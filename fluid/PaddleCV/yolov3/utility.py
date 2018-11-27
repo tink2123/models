@@ -93,13 +93,13 @@ def parse_args():
     # yapf: disable
     # ENV
     add_arg('parallel',         bool,   True,       "Whether use parallel.")
-    add_arg('use_gpu',          bool,  True,      "Whether use GPU.")
+    add_arg('use_gpu',          bool,  False,      "Whether use GPU.")
     add_arg('model_cfg_path',   str,    './config/yolov3.cfg', "YOLO model config file path.")
     add_arg('model_save_dir',   str,    'output',     "The path to save model.")
-    add_arg('pretrained_model', str,    './weights/darknet53', "The init model path.")
+    add_arg('pretrained_model', str,    './weights/yolov3', "The init model path.")
     add_arg('dataset',          str,   'coco2014',  "coco2014, coco2017.")
     add_arg('class_num',        int,   80,          "Class number.")
-    add_arg('data_dir',         str,   'data/coco',        "The data root path.")
+    add_arg('data_dir',         str,   'dataset/coco',        "The data root path.")
     add_arg('use_pyreader',     bool,   False,           "Use pyreader.")
     add_arg('use_profile',         bool,   False,       "Whether use profiler.")
     #SOLVER
@@ -110,7 +110,7 @@ def parse_args():
     add_arg('im_per_batch',       int,   1,        "Minibatch size.")
     add_arg('batch_size_per_im',int,    512,    "fast rcnn head batch size")
     add_arg('nms_thresh',    float, 0.4,    "NMS threshold.")
-    add_arg('conf_thresh',    float, 0.5,    "confidence, score threshold for NMS.")
+    add_arg('conf_thresh',    float, 0.8,    "confidence, score threshold for NMS.")
     add_arg('snapshot_stride',  int,    10000,    "save model every snapshot stride.")
     add_arg('debug',            bool,   False,   "Debug mode")
     # SINGLE EVAL AND DRAW
