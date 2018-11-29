@@ -1,0 +1,4 @@
+classes= 80
+names=coco.names
+train=trainvalno5k.txt
+valid=coco/5k.txt

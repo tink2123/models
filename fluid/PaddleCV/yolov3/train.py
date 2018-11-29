@@ -57,7 +57,7 @@ def train():
     place = fluid.CUDAPlace(0) if cfg.use_gpu else fluid.CPUPlace()
     exe = fluid.Executor(place)
     exe.run(fluid.default_startup_program())
-    # fluid.io.save_persistables(exe, "./test")
+    fluid.io.save_persistables(exe, "./test")
 
     if cfg.pretrained_model:
         def if_exist(var):

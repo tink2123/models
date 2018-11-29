@@ -24,29 +24,11 @@ import reader
 import models
 from utility import print_arguments, parse_args
 import box_utils
-import data_utils
 import json
 from pycocotools.coco import COCO
 from pycocotools.cocoeval import COCOeval, Params
 from config.config import cfg
 
-
-def get_pred_result(boxes, confs, labels, im_id):
-    result = []
-    for box, conf, label in zip(boxes, confs, labels):
-        x1, y1, x2, y2 = box
-        w = x2 - x1 + 1
-        h = y2 - y1 + 2
-        bbox = [x1, y2, w, h]
-        
-        res = {
-                'image_id': im_id,
-                'category_id': label,
-                'bbox': bbox,
-                'score': conf
-        }
-        result.append(res)
-    return result
 
 def eval():
     if '2014' in cfg.dataset:
@@ -54,7 +36,6 @@ def eval():
     elif '2017' in cfg.dataset:
         test_list = 'annotations/instances_val2017.json'
 
-    label_names = data_utils.load_coco_names(os.path.join(cfg.data_dir, "coco.names"))
     devices = os.getenv("CUDA_VISIBLE_DEVICES") or ""
     devices_num = len(devices.split(","))
     print("Found {} CUDA device.".format(devices_num))
@@ -74,34 +55,65 @@ def eval():
     # yapf: enable
     input_size = model.get_input_size()
     test_reader = reader.test(input_size, max(devices_num, 1))
+    label_names, label_ids = reader.get_label_infos()
+    print("Load in labels {} with ids {}".format(label_names, label_ids))
     feeder = fluid.DataFeeder(place=place, feed_list=model.feeds())
+
+    def get_pred_result(boxes, confs, labels, im_id):
+        result = []
+        for box, conf, label in zip(boxes, confs, labels):
+            x1, y1, x2, y2 = box
+            w = x2 - x1 + 1
+            h = y2 - y1 + 2
+            bbox = [x1, y1, w, h]
+            
+            res = {
+                    'image_id': im_id,
+                    'category_id': label_ids[int(label)],
+                    'bbox': bbox,
+                    'score': conf
+            }
+            result.append(res)
+        return result
 
     dts_res = []
     fetch_list = outputs
-    for batch_id, batch_data in enumerate(test_reader):
+    total_time = 0
+    for batch_id, batch_data in enumerate(test_reader()):
         start_time = time.time()
         batch_outputs = exe.run(
             fetch_list=[v.name for v in fetch_list],
             feed=feeder.feed(batch_data),
             return_numpy=False)
         for data, outputs in zip(batch_data, batch_outputs):
+            im_id = data[1]
+            im_shape = data[2]
             pred_boxes, pred_confs, pred_labels = box_utils.get_all_yolo_pred(
-                    outputs, yolo_anchors, yolo_classes, (input_size, input_size))
-            boxes, confs. labels = box_utils.calc_nms_box(pred_boxes, pred_confs, pred_labels,
-                                                    im_shape, input_size, cfg.TEST.conf_thresh,
+                    batch_outputs, yolo_anchors, yolo_classes, (input_size, input_size))
+            boxes, confs, labels = box_utils.calc_nms_box(pred_boxes, pred_confs, pred_labels,
+                                                    im_shape, input_size, cfg.conf_thresh,
                                                     cfg.TEST.nms_thresh)
             im_shape = data[2]
-            dts_res += get_pred_result(boxes, confs, labels, im_shape)
+            dts_res += get_pred_result(boxes, confs, labels, im_id)
+            end_time = time.time()
+            print("batch id: {}, time: {}".format(batch_id, end_time - start_time))
+            total_time += (end_time - start_time)
+
+            # img = coco.loadImgs(im_id)[0]
+            # box_utils.draw_boxes_on_image(os.path.join("./dataset/coco/val2014", img['file_name']), boxes, labels, label_names)
 
     with open("yolov3_result.json", 'w') as outfile:
         json.dump(dts_res, outfile)
     print("start evaluate detection result with coco api")
+    coco = COCO(os.path.join(cfg.data_dir, test_list))
     cocoDt = coco.loadRes("yolov3_result.json")
-    cocoEval = COCOeval(cocoGt, cocoDt, 'bbox')
+    cocoEval = COCOeval(coco, cocoDt, 'bbox')
     cocoEval.evaluate()
     cocoEval.accumulate()
     cocoEval.summarize()
     print("evaluate done.")
+
+    print("Time per bath: {}".format(total_time / batch_id))
 
 
 if __name__ == '__main__':

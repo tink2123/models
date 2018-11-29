@@ -20,8 +20,7 @@ from __future__ import unicode_literals
 
 from paddle.utils.image_util import *
 import random
-from PIL import Image
-from PIL import ImageDraw
+import cv2
 from skimage.transform import resize
 import numpy as np
 import os
@@ -36,6 +35,9 @@ from config.config import cfg
 
 class DataSetReader(object):
     """A class for parsing and read COCO dataset"""
+
+    def __init__(self):
+        self.has_parsed_categpry = False
 
     def _parse_dataset_dir(self, mode):
         if 'coco2014' in cfg.dataset:
@@ -65,15 +67,25 @@ class DataSetReader(object):
 
 
     def _parse_dataset_catagory(self):
-        category_ids = self.COCO.getCatIds()
-        self.categories = [c['name'] for c in self.COCO.loadCats(category_ids)]
+        self.categories = self.COCO.loadCats(self.COCO.getCatIds())
         self.num_category = len(self.categories)
+        self.label_names = []
+        self.label_ids = []
+        for category in self.categories:
+            self.label_names.append(category['name'])
+            self.label_ids.append(int(category['id']))
         self.category_to_id_map = {
             v: i
-            for i, v in enumerate(category_ids)
+            for i, v in enumerate(self.label_ids)
         }
         print("Load in {} categories.".format(self.num_category))
+        self.has_parsed_categpry = True
 
+    def get_label_infos(self):
+        if not self.has_parsed_categpry:
+            self._parse_dataset_dir("test")
+            self._parse_dataset_catagory()
+        return (self.label_names, self.label_ids)
 
     def _parse_gt_annotations(self, img):
         img_height = img['height']
@@ -104,8 +116,8 @@ class DataSetReader(object):
 
     def _extend_img_by_flip(self, imgs):
         """Extern input images by filpping horizontally"""
-        filp_imgs = copy.deepcopy(imgs)
-        for flip_img in filp_imgs:
+        flip_imgs = copy.deepcopy(imgs)
+        for flip_img in flip_imgs:
             flip_img['gt_boxes'] = 1.0 - flip_img['gt_boxes']
             flip_img['flipped'] = False
         imgs.extend(flip_imgs)
@@ -130,7 +142,7 @@ class DataSetReader(object):
                 self._parse_gt_annotations(img)
 
         self._filter_imgs_by_valid_box(imgs)
-        self._extend_img_by_flip(imgs)
+        # self._extend_img_by_flip(imgs)
         print("Loaded {0} images from {1}.".format(len(imgs), cfg.dataset))
 
         return imgs
@@ -149,9 +161,7 @@ class DataSetReader(object):
             im_path = img['image']
             im_shape = (size, size)
             
-            im = np.array(Image.open(img['image'])).astype('float32')
-            if len(im.shape) != 3:
-                return None
+            im = cv2.imread(im_path).astype('float32')
             if img['flipped']:
                 im = im[:, ::-1, 1]
             
@@ -212,7 +222,7 @@ class DataSetReader(object):
                     batch_out.append((im, im_id, im_shape))
                     if len(batch_out) == batch_size:
                         yield batch_out
-                        batch_out = 0
+                        batch_out = []
                 if len(batch_out) != 0:
                     yield batch_out
             else:
@@ -223,12 +233,6 @@ class DataSetReader(object):
                 im, im_id, im_shape = img_reader(img, mode, size)
                 batch_out = [(im, im_id, im_shape)]
                 yield batch_out
-                # for img in imgs:
-                #     if cfg.image_name not in img['image']:
-                #         continue
-                #     im, im_id, im_shape = img_reader(img, mode, size)
-                #     batch_out = [(im, im_id, im_shape)]
-                #     yield batch_out
 
         return reader
 
@@ -244,3 +248,6 @@ def test(size, batch_size, shuffle=False):
 
 def infer(size, image):
     return dsr.get_reader('infer', size, image=image)
+
+def get_label_infos():
+    return dsr.get_label_infos()
