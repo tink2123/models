@@ -93,7 +93,9 @@ def parse_args():
     # yapf: disable
     # ENV
     add_arg('parallel',         bool,   True,       "Whether use parallel.")
-    add_arg('use_gpu',          bool,   True,      "Whether use GPU.")
+    add_arg('use_gpu',          bool,   False,      "Whether use GPU.")
+    add_arg('data_cfg_path',    str,    'dataset/coco.data', "dataset split file config path")
+    add_arg('name_path',        str,    'dataset/coco.names', "label name file path")
     add_arg('model_cfg_path',   str,    './config/yolov3.cfg', "YOLO model config file path.")
     add_arg('model_save_dir',   str,    'output',     "The path to save model.")
     add_arg('pretrained_model', str,    './weights/yolov3', "The init model path.")

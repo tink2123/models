@@ -92,6 +92,7 @@ _C.TRAIN.gt_min_area = -1
 
 # max target box number in an image
 _C.TRAIN.max_box_num = 10
+_C.max_box_num=10
 
 #
 # Inference options

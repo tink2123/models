@@ -5,10 +5,10 @@ weights/
 !weights/*.py
 !weights/*.sh
 dataset/coco/
-!dataset/coco/*.sh
-!dataset/coco/coco.*
 *.swp
 *.log
 log*
 output*
 *.json
+*.jpg
+*.png

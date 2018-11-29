@@ -23,6 +23,7 @@ import paddle.fluid as fluid
 import reader
 import models
 from utility import print_arguments, parse_args
+from coco_reader import load_label_names
 import box_utils
 import json
 from pycocotools.coco import COCO
@@ -35,6 +36,10 @@ def eval():
         test_list = 'annotations/instances_val2014.json'
     elif '2017' in cfg.dataset:
         test_list = 'annotations/instances_val2017.json'
+
+    if cfg.debug:
+        if not os.path.exists('output'):
+            os.mkdir('output')
 
     devices = os.getenv("CUDA_VISIBLE_DEVICES") or ""
     devices_num = len(devices.split(","))
@@ -55,8 +60,9 @@ def eval():
     # yapf: enable
     input_size = model.get_input_size()
     test_reader = reader.test(input_size, max(devices_num, 1))
-    label_names, label_ids = reader.get_label_infos()
-    print("Load in labels {} with ids {}".format(label_names, label_ids))
+    label_names, label_ids = load_label_names(cfg.name_path)
+    if cfg.debug:
+        print("Load in labels {} with ids {}".format(label_names, label_ids))
     feeder = fluid.DataFeeder(place=place, feed_list=model.feeds())
 
     def get_pred_result(boxes, confs, labels, im_id):
@@ -99,8 +105,9 @@ def eval():
             print("batch id: {}, time: {}".format(batch_id, end_time - start_time))
             total_time += (end_time - start_time)
 
-            # img = coco.loadImgs(im_id)[0]
-            # box_utils.draw_boxes_on_image(os.path.join("./dataset/coco/val2014", img['file_name']), boxes, labels, label_names)
+            if cfg.debug:
+                img_name = "COCO_val2014_{:012d}.jpg".format(im_id)
+                box_utils.draw_boxes_on_image(os.path.join("./dataset/coco/images/val2014", img_name), boxes, labels, label_names)
 
     with open("yolov3_result.json", 'w') as outfile:
         json.dump(dts_res, outfile)

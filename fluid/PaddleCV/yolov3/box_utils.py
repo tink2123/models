@@ -235,14 +235,13 @@ def draw_boxes_on_image(image_path, boxes, labels, label_names):
     image = Image.open(image_path)
     draw = ImageDraw.Draw(image)
 
+    image_name = image_path.split('/')[-1]
+    print("Image {} detect: ".format(image_name))
     for box, label in zip(boxes, labels):
         x1, y1, x2, y2 = box[0], box[1], box[2], box[3]
-        # x1, x2 = box[0] - box[2] / 2, box[0] + box[2] / 2
-        # y1, y2 = box[1] - box[3] / 2, box[1] + box[3] / 2
         draw.rectangle((x1, y1, x2, y2), outline='red')
         if image.mode == 'RGB':
             draw.text((x1, y1), label_names[int(label)], (255, 255, 0))
-    image_name = image_path.split('/')[-1]
-    print("image with bbox drawed saved as {}".format(image_name))
-    image.save(image_name)
+        print("\t {:15s} at {}".format(label_names[int(label)], map(int, list(box))))
+    image.save("./output/" + image_name)
 

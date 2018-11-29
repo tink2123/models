@@ -7,7 +7,7 @@ import reader
 from utility import print_arguments, parse_args
 import models
 import box_utils
-import data_utils
+from coco_reader import load_label_names
 import json
 from pycocotools.coco import COCO
 from pycocotools.cocoeval import COCOeval, Params
@@ -18,13 +18,10 @@ from config.config import cfg
 
 def infer():
 
-    if '2014' in cfg.dataset:
-        test_list = 'annotations/instances_val2014.json'
-    elif '2017' in cfg.dataset:
-        test_list = 'annotations/instances_val2017.json'
+    if not os.path.exists('output'):
+        os.mkdir('output')
 
-    label_names = data_utils.load_coco_names(os.path.join(cfg.data_dir, "coco.names"))
-
+    label_names, _ = load_label_names(cfg.name_path)
     model = models.YOLOv3(cfg.model_cfg_path, is_train=False)
     model.build_model()
     outputs = model.get_pred()
