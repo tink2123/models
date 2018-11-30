@@ -246,10 +246,10 @@ class YOLOv3(object):
                 )
         self.gtbox = fluid.layers.data(
                 # name='gtbox', shape=[cfg.TRAIN.max_box_num, 4], dtype='float32', lod_level=1
-                name='gtbox', shape=[10, 4], dtype='float32', lod_level=1
+                name='gtbox', shape=[10, 4], dtype='float32'
                 )
         self.gtlabel = fluid.layers.data(
-                name='gtlabel', shape=[10], dtype='int32', lod_level=1
+                name='gtlabel', shape=[10], dtype='int32'
                 )
         self.im_shape = fluid.layers.data(
                 name="im_shape", shape=[2], dtype='int32')
@@ -259,7 +259,7 @@ class YOLOv3(object):
     def feeds(self):
         if not self.is_train:
             return [self.image, self.im_id, self.im_shape]
-        return [self.image, self.gtbox, self.gtlabel, self.im_id, self.im_shape]
+        return [self.image, self.gtbox, self.gtlabel]
 
     def get_hyperparams(self):
         return self.hyperparams

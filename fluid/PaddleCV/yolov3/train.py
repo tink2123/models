@@ -38,10 +38,6 @@ def train():
         random.seed(0)
         np.random.seed(0)
 
-    # devices = os.getenv("CUDA_VISIBLE_DEVICES") or ""
-    # devices_num = len(devices.split(","))
-    # total_batch_size = devices_num * cfg.TRAIN.im_per_batch
-
     model = models.YOLOv3(cfg.model_cfg_path)
     model.build_model()
     loss = model.loss()
@@ -52,12 +48,16 @@ def train():
     optimizer = fluid.optimizer.Adam(learning_rate=learning_rate)
     optimizer.minimize(loss)
 
+    devices = os.getenv("CUDA_VISIBLE_DEVICES") or ""
+    devices_num = len(devices.split(","))
+    total_batch_size = devices_num * int(hyperparams['batch'])
+
     fluid.memory_optimize(fluid.default_main_program())
 
     place = fluid.CUDAPlace(0) if cfg.use_gpu else fluid.CPUPlace()
     exe = fluid.Executor(place)
     exe.run(fluid.default_startup_program())
-    fluid.io.save_persistables(exe, "./test")
+    # fluid.io.save_persistables(exe, "./test")
 
     if cfg.pretrained_model:
         def if_exist(var):
@@ -77,7 +77,7 @@ def train():
     #     py_reader = model.py_reader
     #     py_reader.decorate_paddle_reader(train_reader)
     input_size = model.get_input_size()
-    train_reader = reader.train(input_size, batch_size=cfg.TRAIN.im_per_batch, shuffle=True)
+    train_reader = reader.train(input_size, batch_size=int(hyperparams['subdivisions']), shuffle=False)
     feeder = fluid.DataFeeder(place=place, feed_list=model.feeds())
 
     def save_model(postfix):
@@ -121,6 +121,7 @@ def train():
         every_pass_loss = []
         smoothed_loss = SmoothedValue(cfg.log_window)
         for iter_id, data in enumerate(train_reader()):
+            print(data[0][0].shape, data[0][1].shape, data[0][2].shape)
             prev_start_time = start_time
             start_time = time.time()
             losses = train_exe.run(fetch_list=[v.name for v in fetch_list],

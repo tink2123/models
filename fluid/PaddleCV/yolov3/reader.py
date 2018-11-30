@@ -241,8 +241,8 @@ def get_reader(mode, size=608, batch_size=None, shuffle=True, img_path=None):
             batch_out = []
             index = 0
             while True:
-                img, gt_boxes, gt_labels, img_id, img_shape = dataset[index]
-                batch_out.append((img, gt_boxes, gt_labels, img_id, img_shape))
+                img, gt_boxes, gt_labels = dataset[index]
+                batch_out.append((img, gt_boxes, gt_labels))
                 index += 1
                 if len(batch_out) == batch_size:
                     yield batch_out
@@ -259,7 +259,7 @@ def get_reader(mode, size=608, batch_size=None, shuffle=True, img_path=None):
             if len(batch_out) != 0:
                 yield batch_out
         else:
-            img, h, w, _, _ = read_img_data(img_path, size)
+            img, h, w, _, _, _ = read_img_data(img_path, size)
             batch_out = [(img, 0, (h, w))]
             yield batch_out
 

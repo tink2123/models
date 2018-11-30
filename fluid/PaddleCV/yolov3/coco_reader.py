@@ -64,7 +64,7 @@ def read_img_data(img_path, img_size):
     out_img = resize(out_img, (img_size, img_size, 3), mode='reflect')
     out_img = out_img.transpose((2, 0, 1))
 
-    return out_img, h, w, padded_h, padded_w
+    return out_img, h, w, pad, padded_h, padded_w
 
 
 class CocoDataset(object):
@@ -79,11 +79,11 @@ class CocoDataset(object):
 
     def __getitem__(self, index):
         if self.shuffle and index % self.file_num == 0:
-            self.img_list = random.shuffle(self.img_list)
+            random.shuffle(self.img_list)
         img_path = self.img_list[index % self.file_num]
-        label_path = img_path.replace("images", "labels")[:-4] + "txt"       
+        label_path = img_path.replace("images", "labels")[:-3] + "txt"       
 
-        img, h, w, padded_h, padded_w = read_img_data(img_path, self.img_size)
+        img, h, w, pad, padded_h, padded_w = read_img_data(img_path, self.img_size)
         img_id = int(img_path.split('/')[-1].split('.')[0].split('_')[-1])
 
         if self.mode == "valid":
@@ -92,9 +92,9 @@ class CocoDataset(object):
         labels = np.zeros((cfg.max_box_num))
         boxes = np.zeros((cfg.max_box_num, 4))
         if os.path.exists(label_path):
-            label_data = np.loadtxt(label_path).rehsape((-1, 5))
+            label_data = np.loadtxt(label_path).reshape((-1, 5))
             gt_labels = label_data[:, 0]
-            gt_boxes = label_data[:, 1:].astype('flaot32')
+            gt_boxes = label_data[:, 1:].astype('float32')
 
             x1 = (gt_boxes[:, 0] - gt_boxes[:, 2] / 2.0) * w
             x2 = (gt_boxes[:, 0] + gt_boxes[:, 2] / 2.0) * w
@@ -114,7 +114,7 @@ class CocoDataset(object):
             labels[: min(len(gt_labels), cfg.max_box_num)] = gt_labels[:cfg.max_box_num]
             boxes[: min(len(gt_boxes), cfg.max_box_num)] = gt_boxes[:cfg.max_box_num]
 
-        return (img, boxes, labels, img_id, (h, w))
+        return (img, boxes, labels)
 
     def __len__(self):
         return self.file_num
