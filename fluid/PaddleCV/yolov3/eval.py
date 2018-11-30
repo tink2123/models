@@ -33,7 +33,7 @@ from config.config import cfg
 
 def eval():
     if '2014' in cfg.dataset:
-        test_list = 'annotations/instances_val2014.json'
+        test_list = 'annotations/instances_val2014.json.new'
     elif '2017' in cfg.dataset:
         test_list = 'annotations/instances_val2017.json'
 
@@ -50,7 +50,7 @@ def eval():
     outputs = model.get_pred()
     yolo_anchors = model.get_yolo_anchors()
     yolo_classes = model.get_yolo_classes()
-    place = fluid.CUDAPlace(0) if cfg.use_gpu else fluid.CPUPlace()
+    place = fluid.CUDAPlace(1) if cfg.use_gpu else fluid.CPUPlace()
     exe = fluid.Executor(place)
     # yapf: disable
     if cfg.pretrained_model:

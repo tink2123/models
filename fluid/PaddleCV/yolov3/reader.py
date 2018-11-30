@@ -234,6 +234,7 @@ def get_reader(mode, size=608, batch_size=None, shuffle=True, img_path=None):
         assert batch_size is not None, "batch size connot be None in mode {}".format(mode)
         data_mode = "train" if mode == 'train' else "valid"
         dataset = CocoDataset(cfg.data_cfg_path, data_mode, size, shuffle)
+        print("Load in {} images for {}".format(len(dataset), mode))
 
     def reader():
         if mode == 'train':
@@ -248,7 +249,9 @@ def get_reader(mode, size=608, batch_size=None, shuffle=True, img_path=None):
                     batch_out = []
         elif mode == 'test':
             batch_out = []
-            for img, gt_boxes, gt_labels, img_id, img_shape in dataset:
+            for i, (img, img_id, img_shape) in enumerate(dataset):
+                if i >= len(dataset):
+                    break
                 batch_out.append((img, img_id, img_shape))
                 if len(batch_out) == batch_size:
                     yield batch_out

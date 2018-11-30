@@ -86,6 +86,9 @@ class CocoDataset(object):
         img, h, w, padded_h, padded_w = read_img_data(img_path, self.img_size)
         img_id = int(img_path.split('/')[-1].split('.')[0].split('_')[-1])
 
+        if self.mode == "valid":
+            return (img, img_id, (h, w))
+
         labels = np.zeros((cfg.max_box_num))
         boxes = np.zeros((cfg.max_box_num, 4))
         if os.path.exists(label_path):
