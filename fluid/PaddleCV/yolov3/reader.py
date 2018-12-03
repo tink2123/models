@@ -250,9 +250,11 @@ def get_reader(mode, size=608, batch_size=None, shuffle=True, img_path=None):
         elif mode == 'test':
             batch_out = []
             for i, (img, img_id, img_shape) in enumerate(dataset):
+            # for i, (img, img_id, img_scale) in enumerate(dataset):
                 if i >= len(dataset):
                     break
                 batch_out.append((img, img_id, img_shape))
+                # batch_out.append((img, img_id, img_scale))
                 if len(batch_out) == batch_size:
                     yield batch_out
                     batch_out = []
@@ -261,6 +263,8 @@ def get_reader(mode, size=608, batch_size=None, shuffle=True, img_path=None):
         else:
             img, h, w, _, _, _ = read_img_data(img_path, size)
             batch_out = [(img, 0, (h, w))]
+            # img, img_scale = read_img_data(img_path, size)
+            # batch_out = [(img, 0, img_scale)]
             yield batch_out
 
     return reader

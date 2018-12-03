@@ -48,9 +48,10 @@ def eval():
     model = models.YOLOv3(cfg.model_cfg_path, is_train=False)
     model.build_model()
     outputs = model.get_pred()
+    hyperparams = model.get_hyperparams()
     yolo_anchors = model.get_yolo_anchors()
     yolo_classes = model.get_yolo_classes()
-    place = fluid.CUDAPlace(1) if cfg.use_gpu else fluid.CPUPlace()
+    place = fluid.CUDAPlace(0) if cfg.use_gpu else fluid.CPUPlace()
     exe = fluid.Executor(place)
     # yapf: disable
     if cfg.pretrained_model:
@@ -107,7 +108,7 @@ def eval():
 
             if cfg.debug:
                 img_name = "COCO_val2014_{:012d}.jpg".format(im_id)
-                box_utils.draw_boxes_on_image(os.path.join("./dataset/coco/images/val2014", img_name), boxes, labels, label_names)
+                box_utils.draw_boxes_on_image(os.path.join("./dataset/coco/images/val2014", img_name), boxes, confs, labels, label_names)
 
     with open("yolov3_result.json", 'w') as outfile:
         json.dump(dts_res, outfile)

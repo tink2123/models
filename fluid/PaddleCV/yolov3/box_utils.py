@@ -38,7 +38,8 @@ def get_yolo_detection(preds, anchors, class_num, img_width, img_height):
 
     pred_boxes = preds_n[:, :, :, :, :4]
     pred_confs = preds_n[:, :, :, :, 4]
-    pred_classes = preds_n[:, :, :, :, 5:]
+    # pred_classes = preds_n[:, :, :, :, 5:]
+    pred_classes = preds_n[:, :, :, :, 5:] * np.expand_dims(pred_confs, axis=4)
 
     grid_x = np.tile(np.arange(w).reshape((1, w)), (h, 1))
     grid_y = np.tile(np.arange(h).reshape((h, 1)), (1, w))
@@ -180,9 +181,10 @@ def rescale_box_in_input_image(boxes, im_shape, input_size):
     else:
         boxes[:, 0] -= pad
         boxes[:, 2] -= pad
+    boxes[boxes<0] == 0
     return boxes
 
-def calc_nms_box(pred_boxes, pred_confs, pred_labels, im_shape, input_size, conf_thresh=0.8, nms_thresh=0.4):
+def calc_nms_box(pred_boxes, pred_confs, pred_labels, im_shape, input_size, valid_thresh=0.8, nms_thresh=0.4, nms_topk=400, nms_posk=100):
     """
     Removes detections which confidence score under conf_thresh and perform 
     Non-Maximun Suppression to filtered boxes
@@ -193,12 +195,17 @@ def calc_nms_box(pred_boxes, pred_confs, pred_labels, im_shape, input_size, conf
     output_confs = np.empty(0)
     output_labels = np.empty((0))
     for i, (boxes, confs, classes) in enumerate(zip(pred_boxes, pred_confs, pred_labels)):
-        conf_mask = confs > conf_thresh
+        conf_mask = confs > valid_thresh
         if conf_mask.sum() == 0:
             continue
         boxes = boxes[conf_mask]
         classes = classes[conf_mask]
         confs = confs[conf_mask]
+
+        conf_sort_index = np.argsort(confs)[::-1]
+        boxes = boxes[conf_sort_index][:nms_topk]
+        classes = classes[conf_sort_index][:nms_topk]
+        confs = confs[conf_sort_index][:nms_topk]
         cls_score = np.max(classes, axis=1)
         cls_pred = np.argmax(classes, axis=1)
 
@@ -227,21 +234,27 @@ def calc_nms_box(pred_boxes, pred_confs, pred_labels, im_shape, input_size, conf
             output_boxes = np.append(output_boxes, detect_boxes, axis=0)
             output_confs = np.append(output_confs, detect_confs)
             output_labels = np.append(output_labels, detect_labels)
+    
+    output_boxes = output_boxes[:nms_posk]
+    output_confs = output_confs[:nms_posk]
+    output_labels = output_labels[:nms_posk]
 
     output_boxes = rescale_box_in_input_image(output_boxes, im_shape, input_size)
     return (output_boxes, output_confs, output_labels)
 
-def draw_boxes_on_image(image_path, boxes, labels, label_names):
+def draw_boxes_on_image(image_path, boxes, confs, labels, label_names, conf_thresh=0.5):
     image = Image.open(image_path)
     draw = ImageDraw.Draw(image)
 
     image_name = image_path.split('/')[-1]
     print("Image {} detect: ".format(image_name))
-    for box, label in zip(boxes, labels):
+    for box, conf, label in zip(boxes, confs, labels):
+        if conf < conf_thresh:
+            continue
         x1, y1, x2, y2 = box[0], box[1], box[2], box[3]
         draw.rectangle((x1, y1, x2, y2), outline='red')
         if image.mode == 'RGB':
-            draw.text((x1, y1), label_names[int(label)], (255, 255, 0))
-        print("\t {:15s} at {}".format(label_names[int(label)], map(int, list(box))))
+            draw.text((x1, y1), "{} {:.4f}".format(label_names[int(label)], conf), (255, 255, 0))
+        print("\t {:15s} at {:25} score: {:.5f}".format(label_names[int(label)], map(int, list(box)), conf))
     image.save("./output/" + image_name)
 

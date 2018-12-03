@@ -42,6 +42,7 @@ def infer():
     fetch_list = outputs
     data = next(infer_reader())
     im_shape = data[0][2]
+    # im_scale = data[0][2]
     outputs = exe.run(
         fetch_list=[v.name for v in fetch_list],
         feed=feeder.feed(data),
@@ -53,7 +54,7 @@ def infer():
                                     im_shape, input_size, cfg.conf_thresh, 
                                     cfg.TEST.nms_thresh)
     path = os.path.join(cfg.image_path, cfg.image_name)
-    box_utils.draw_boxes_on_image(path, boxes, labels, label_names)
+    box_utils.draw_boxes_on_image(path, boxes, confs, labels, label_names)
 
 
 if __name__ == '__main__':

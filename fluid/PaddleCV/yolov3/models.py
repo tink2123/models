@@ -44,7 +44,6 @@ def conv_bn_layer(input,
             padding=padding,
             act=None,
             param_attr=ParamAttr(initializer=fluid.initializer.Normal(0., 0.02),
-            # param_attr=ParamAttr(initializer=fluid.initializer.Constant(1.0),
                                  name=name + "_weights"),
             bias_attr=False,
             name=name + '.conv2d.output.1')
@@ -56,17 +55,13 @@ def conv_bn_layer(input,
                                       is_test=not is_train,
                                       param_attr=ParamAttr(
                                             initializer=fluid.initializer.Normal(0., 0.02),
-                                            # initializer=fluid.initializer.Constant(2.0),
                                             name=bn_name + '_scale'),
                                       bias_attr=ParamAttr(
                                             initializer=fluid.initializer.Constant(0.0),
-                                            # initializer=fluid.initializer.Constant(3.0),
                                             name=bn_name + '_offset'),
                                       moving_mean_name=bn_name+'_mean',
                                       moving_variance_name=bn_name+'_var',
                                       name=bn_name+'.output')
-        if act == "leaky":
-            out = fluid.layers.leaky_relu(x=out, alpha=0.1)
     else:
         out = fluid.layers.conv2d(
             input=input,
@@ -76,16 +71,15 @@ def conv_bn_layer(input,
             padding=padding,
             act=None,
             param_attr=ParamAttr(initializer=fluid.initializer.Normal(0., 0.02),
-            # param_attr=ParamAttr(initializer=fluid.initializer.Constant(1.0),
                                  name=name + "_weights"),
             bias_attr=ParamAttr(initializer=fluid.initializer.Constant(0.0),
-            # bias_attr=ParamAttr(initializer=fluid.initializer.Constant(4.0),
                                  name=name + "_bias"),
             name=name + '.conv2d.output.1')
-        if act == 'relu':
-            out = fluid.layers.relu(x=out)
-        if act == 'leaky':
-            out = fluid.layers.leaky_relu(x=out)
+
+    if act == 'relu':
+        out = fluid.layers.relu(x=out)
+    if act == 'leaky':
+        out = fluid.layers.leaky_relu(x=out, alpha=0.1)
     return out
 
 
@@ -253,12 +247,15 @@ class YOLOv3(object):
                 )
         self.im_shape = fluid.layers.data(
                 name="im_shape", shape=[2], dtype='int32')
+        # self.im_scale = fluid.layers.data(
+        #         name="im_scale", shape=[1], dtype='float32')
         self.im_id = fluid.layers.data(
                 name="im_id", shape=[1], dtype='int32')
     
     def feeds(self):
         if not self.is_train:
             return [self.image, self.im_id, self.im_shape]
+            # return [self.image, self.im_id, self.im_scale]
         return [self.image, self.gtbox, self.gtlabel]
 
     def get_hyperparams(self):

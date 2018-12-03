@@ -52,43 +52,7 @@ _C.TRAIN.bg_thresh_lo = 0.0
 _C.TRAIN.padding_minibatch = False
 
 # Snapshot period
-_C.TRAIN.snapshot_iter = 10000
-
-# number of RPN proposals to keep before NMS
-_C.TRAIN.rpn_pre_nms_top_n = 12000
-
-# number of RPN proposals to keep after NMS
-_C.TRAIN.rpn_post_nms_top_n = 2000
-
-# NMS threshold used on RPN proposals
-_C.TRAIN.rpn_nms_thresh = 0.7
-
-# min size in RPN proposals
-_C.TRAIN.rpn_min_size = 0.0
-
-# eta for adaptive NMS in RPN
-_C.TRAIN.rpn_eta = 1.0
-
-# number of RPN examples per image
-_C.TRAIN.rpn_batch_size_per_im = 256
-
-# remove anchors out of the image
-_C.TRAIN.rpn_straddle_thresh = 0.
-
-# target fraction of foreground examples pre RPN minibatch
-_C.TRAIN.rpn_fg_fraction = 0.5
-
-# min overlap between anchor and gt box to be a positive examples
-_C.TRAIN.rpn_positive_overlap = 0.7
-
-# max overlap between anchor and gt box to be a negative examples
-_C.TRAIN.rpn_negative_overlap = 0.3
-
-# stopgrad at a specified stage
-_C.TRAIN.freeze_at = 2
-
-# min area of ground truth box
-_C.TRAIN.gt_min_area = -1
+_C.TRAIN.snapshot_iter = 2000
 
 # max target box number in an image
 _C.TRAIN.max_box_num = 10
@@ -133,24 +97,6 @@ _C.TEST.rpn_nms_thresh = 0.7
 # Model options
 #
 
-# weight for bbox regression targets
-_C.bbox_reg_weights = [0.1, 0.1, 0.2, 0.2]
-
-# RPN anchor sizes
-_C.anchor_sizes = [32, 64, 128, 256, 512]
-
-# RPN anchor ratio
-_C.aspect_ratio = [0.5, 1, 2]
-
-# variance of anchors
-_C.variances = [1., 1., 1., 1.]
-
-# stride of feature map
-_C.rpn_stride = [16.0, 16.0]
-
-# Use roi pool or roi align, 'RoIPool' or 'RoIAlign'
-_C.roi_func = 'RoIAlign'
-
 # sampling ratio for roi align
 _C.sampling_ratio = 0
 
@@ -165,17 +111,17 @@ _C.spatial_scale = 1. / 16.
 #
 
 # derived learning rate the to get the final learning rate.
-_C.learning_rate = 0.01
+_C.learning_rate = 0.001
 
 # maximum number of iterations
-_C.max_iter = 180000
+_C.max_iter = 1000000
 
 # warm up to learning rate 
-_C.warm_up_iter = 500
-_C.warm_up_factor = 1. / 3.
+_C.warm_up_iter = 4000
+_C.warm_up_factor = 0.
 
 # lr steps_with_decay
-_C.lr_steps = [120000, 160000]
+_C.lr_steps = [800000, 900000]
 _C.lr_gamma = 0.1
 
 # L2 regularization hyperparameter
@@ -195,7 +141,7 @@ _C.use_gpu = True
 _C.parallel = True
 
 # Class number
-_C.class_num = 81
+_C.class_num = 80
 
 # support pyreader
 _C.use_pyreader = True
