@@ -147,16 +147,16 @@ _C.class_num = 80
 _C.use_pyreader = True
 
 # pixel mean values
-_C.pixel_means = [102.9801, 115.9465, 122.7717]
+_C.pixel_means = [0.485, 0.456, 0.406]
 
-# clip box to prevent overflowing
-_C.bbox_clip = np.log(1000. / 16.)
+# pixel std values
+_C.pixel_stds = [0.229, 0.224, 0.225]
 
 # dataset path
-_C.train_file_list = 'annotations/instances_train2014.json'
-_C.train_data_dir = 'train2014'
-_C.val_file_list = 'annotations/instances_val2014.json'
-_C.val_data_dir = 'val2014'
+_C.train_file_list = 'annotations/instances_train2017.json'
+_C.train_data_dir = 'train2017'
+_C.val_file_list = 'annotations/instances_val2017.json'
+_C.val_data_dir = 'val2017'
 
 
 def merge_cfg_from_args(args, mode):

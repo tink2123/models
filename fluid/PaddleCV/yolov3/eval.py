@@ -20,11 +20,11 @@ import time
 import numpy as np
 import paddle
 import paddle.fluid as fluid
+import box_utils
 import reader
 import models
 from utility import print_arguments, parse_args
-from coco_reader import load_label_names
-import box_utils
+# from coco_reader import load_label_names
 import json
 from pycocotools.coco import COCO
 from pycocotools.cocoeval import COCOeval, Params
@@ -33,7 +33,7 @@ from config.config import cfg
 
 def eval():
     if '2014' in cfg.dataset:
-        test_list = 'annotations/instances_val2014.json.new'
+        test_list = 'annotations/instances_val2014.json'
     elif '2017' in cfg.dataset:
         test_list = 'annotations/instances_val2017.json'
 
@@ -61,7 +61,7 @@ def eval():
     # yapf: enable
     input_size = model.get_input_size()
     test_reader = reader.test(input_size, max(devices_num, 1))
-    label_names, label_ids = load_label_names(cfg.name_path)
+    label_names, label_ids = reader.get_label_infos()
     if cfg.debug:
         print("Load in labels {} with ids {}".format(label_names, label_ids))
     feeder = fluid.DataFeeder(place=place, feed_list=model.feeds())
@@ -95,20 +95,23 @@ def eval():
         for data, outputs in zip(batch_data, batch_outputs):
             im_id = data[1]
             im_shape = data[2]
-            pred_boxes, pred_confs, pred_labels = box_utils.get_all_yolo_pred(
+            pred_boxes, pred_scores, pred_labels = box_utils.get_all_yolo_pred(
                     batch_outputs, yolo_anchors, yolo_classes, (input_size, input_size))
-            boxes, scores, labels = box_utils.calc_nms_box(pred_boxes, pred_confs, pred_labels,
-                                                    im_shape, input_size, cfg.conf_thresh,
-                                                    cfg.TEST.nms_thresh)
-            im_shape = data[2]
+            boxes, scores, labels = box_utils.calc_nms_box_new(pred_boxes, pred_scores, pred_labels,
+                                                    cfg.valid_thresh, cfg.TEST.nms_thresh)
+            boxes = box_utils.rescale_box_in_input_image(boxes, im_shape, input_size)
             dts_res += get_pred_result(boxes, scores, labels, im_id)
             end_time = time.time()
             print("batch id: {}, time: {}".format(batch_id, end_time - start_time))
             total_time += (end_time - start_time)
 
             if cfg.debug:
-                img_name = "COCO_val2014_{:012d}.jpg".format(im_id)
-                box_utils.draw_boxes_on_image(os.path.join("./dataset/coco/images/val2014", img_name), boxes, scores, labels, label_names)
+                if '2014' in cfg.dataset:
+                    img_name = "COCO_val2014_{:012d}.jpg".format(im_id)
+                    box_utils.draw_boxes_on_image(os.path.join("./dataset/coco/val2014", img_name), boxes, scores, labels, label_names)
+                if '2017' in cfg.dataset:
+                    img_name = "{:012d}.jpg".format(im_id)
+                    box_utils.draw_boxes_on_image(os.path.join("./dataset/coco/val2017", img_name), boxes, scores, labels, label_names)
 
     with open("yolov3_result.json", 'w') as outfile:
         json.dump(dts_res, outfile)
@@ -121,7 +124,7 @@ def eval():
     cocoEval.summarize()
     print("evaluate done.")
 
-    print("Time per bath: {}".format(total_time / batch_id))
+    print("Time per batch: {}".format(total_time / batch_id))
 
 
 if __name__ == '__main__':

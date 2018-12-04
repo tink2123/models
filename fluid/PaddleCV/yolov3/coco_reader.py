@@ -57,28 +57,30 @@ def get_img_path_list(data_cfg_path, mode):
 def read_img_data(img_path, img_size, mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]):
     assert os.path.exists(img_path), "Image {} not found".format(img_path)
     img = cv2.imread(img_path).astype('float32')
+    img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
     h, w, _ = img.shape
     # dim_diff = np.abs(h - w)
     # pad1, pad2 = dim_diff // 2, dim_diff - dim_diff // 2
     # pad = ((pad1, pad2), (0, 0), (0, 0)) if h <= w else ((0, 0), (pad1, pad2), (0, 0))
-    # img = np.pad(img, pad, 'constant', constant_values=128.0) / 255.0
+    # img = np.pad(img, pad, 'constant', constant_values=127.5) / 255.0
     # padded_h, padded_w, _ = img.shape
-    # out_img = resize(img, (img_size, img_size, 3), mode='reflect')
+    # out_img = resize(img / 255.0, (img_size, img_size, 3), mode='reflect')
     # im_scale = img_size / float(padded_h)
     # im_scale = img_size / float(max(h, w))
     im_scale_x = img_size / float(w)
     im_scale_y = img_size / float(h)
-    out_img = cv2.resize(img, None, None, fx=im_scale_x, fy=im_scale_y, interpolation=cv2.INTER_LINEAR) / 255.0
+    out_img = cv2.resize(img, None, None, fx=im_scale_x, fy=im_scale_y, interpolation=cv2.INTER_CUBIC)
+    # out_img = tf.image.imresize(mx.nd.array(img), img_size, img_size, interp=9).asnumpy()
+    # out_img = np.round(out_img)
     mean = np.array(mean).reshape((1, 1, -1))
     std = np.array(std).reshape((1, 1, -1))
-    out_img = (out_img - mean) / std
+    out_img = (out_img / 255.0 - mean) / std
     # scale_h, scale_w, _ = out_img.shape
     # dim_diff = np.abs(scale_h - scale_w)
     # pad1, pad2 = dim_diff // 2, dim_diff - dim_diff // 2
     # pad = ((pad1, pad2), (0, 0), (0, 0)) if h <= w else ((0, 0), (pad1, pad2), (0, 0))
     # out_img = np.pad(out_img, pad, 'constant', constant_values=0.0)
     out_img = out_img.transpose((2, 0, 1))
-    # print(out_img.shape)
 
     # return out_img, h, w, pad, padded_h, padded_w
     # return out_img, h, w, pad, max(h, w), max(h, w)
@@ -101,13 +103,11 @@ class CocoDataset(object):
         img_path = self.img_list[index % self.file_num]
         label_path = img_path.replace("images", "labels")[:-3] + "txt"       
 
-        img, h, w, pad, padded_h, padded_w = read_img_data(img_path, self.img_size)
-        # img, im_scale = read_img_data(img_path, self.img_size)
+        img, h, w, pad, padded_h, padded_w = read_img_data(img_path, self.img_size, cfg.pixel_means, cfg.pixel_std)
         img_id = int(img_path.split('/')[-1].split('.')[0].split('_')[-1])
 
         if self.mode == "valid":
             return (img, img_id, (h, w))
-            # return (img, img_id, im_scale)
 
         labels = np.zeros((cfg.max_box_num))
         boxes = np.zeros((cfg.max_box_num, 4))

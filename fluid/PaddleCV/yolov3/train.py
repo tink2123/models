@@ -50,7 +50,6 @@ def train():
     total_batch_size = devices_num * int(hyperparams['batch'])
 
     learning_rate = float(hyperparams['learning_rate'])
-    # optimizer = fluid.optimizer.Adam(learning_rate=learning_rate)
     boundaries = cfg.lr_steps
     gamma = cfg.lr_gamma
     step_num = len(cfg.lr_steps)
@@ -93,7 +92,7 @@ def train():
     #     py_reader = model.py_reader
     #     py_reader.decorate_paddle_reader(train_reader)
     input_size = model.get_input_size()
-    train_reader = reader.train(input_size, batch_size=int(hyperparams['batch']) / 2, shuffle=False)
+    train_reader = reader.train(input_size, batch_size=int(hyperparams['batch']) / 2, shuffle=True)
     feeder = fluid.DataFeeder(place=place, feed_list=model.feeds())
 
     def save_model(postfix):

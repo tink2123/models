@@ -30,60 +30,6 @@ def sigmoid(x):
     """Perform sigmoid to input numpy array"""
     return 1.0 / (1.0 + np.exp(-1.0 * x))
 
-def get_yolo_detection(preds, anchors, class_num, img_width, img_height):
-    """Get yolo box, confidence score, class label from Darknet53 output"""
-    preds_n = np.array(preds)
-    n, c, h, w = preds_n.shape
-    anchor_num = len(anchors) // 2
-    preds_n = preds_n.reshape([n, anchor_num, class_num + 5, h, w]) \
-                     .transpose((0, 1, 3, 4, 2))
-    preds_n[:, :, :, :, :2] = sigmoid(preds_n[:, :, :, :, :2])
-    preds_n[:, :, :, :, 4:] = sigmoid(preds_n[:, :, :, :, 4:])
-
-    pred_boxes = preds_n[:, :, :, :, :4]
-    pred_confs = preds_n[:, :, :, :, 4]
-    # pred_classes = preds_n[:, :, :, :, 5:]
-    pred_classes = preds_n[:, :, :, :, 5:] * np.expand_dims(pred_confs, axis=4)
-
-    grid_x = np.tile(np.arange(w).reshape((1, w)), (h, 1))
-    grid_y = np.tile(np.arange(h).reshape((h, 1)), (1, w))
-    anchors = [(anchors[i], anchors[i+1]) for i in range(0, len(anchors), 2)]
-    anchors_s = np.array([(an_w * w / img_width, an_h * h / img_height) for an_w, an_h in anchors])
-    anchor_w = anchors_s[:, 0:1].reshape((1, anchor_num, 1, 1))
-    anchor_h = anchors_s[:, 1:2].reshape((1, anchor_num, 1, 1))
-
-    pred_boxes[:, :, :, :, 0] += grid_x
-    pred_boxes[:, :, :, :, 1] += grid_y
-    pred_boxes[:, :, :, :, 2] = np.exp(pred_boxes[:, :, :, :, 2]) * anchor_w
-    pred_boxes[:, :, :, :, 3] = np.exp(pred_boxes[:, :, :, :, 3]) * anchor_h
-
-    return (
-            pred_boxes.reshape((n, -1, 4)) * img_width / w, 
-            pred_confs.reshape((n, -1)), 
-            pred_classes.reshape((n, -1, class_num))
-            )
-
-def get_all_yolo_pred(outputs, yolo_anchors, yolo_classes, input_shape):    
-    all_pred_boxes = []
-    all_pred_confs = []
-    all_pred_labels = []
-    for output, anchors, classes in zip(outputs, yolo_anchors, yolo_classes):
-        pred_boxes, pred_confs, pred_labels = get_yolo_detection(output, anchors, classes, input_shape[0], input_shape[1])
-        preds = np.concatenate([pred_boxes, np.expand_dims(pred_confs, 2)], axis=2)
-        # f = open("output{}.txt".format(index), 'w')
-        # f.write(str(preds.shape) + "\n")
-        # f.write(str(preds))
-        # f.close()
-        # index += 1
-        all_pred_boxes.append(pred_boxes)
-        all_pred_confs.append(pred_confs)
-        all_pred_labels.append(pred_labels)
-    pred_boxes = np.concatenate(all_pred_boxes, axis=1)
-    pred_confs = np.concatenate(all_pred_confs, axis=1)
-    pred_labels = np.concatenate(all_pred_labels, axis=1)
-
-    return (pred_boxes, pred_confs, pred_labels)
-
 def coco_anno_box_to_center_relative(box, img_width, img_height):
     """
     Convert COCO annotations box with format [x1, y1, w, h] to 
@@ -194,6 +140,106 @@ def rescale_box_in_input_image(boxes, im_shape, input_size):
     boxes[boxes<0] = 0
     return boxes
 
+def get_yolo_detection(preds, anchors, class_num, img_width, img_height):
+    """Get yolo box, confidence score, class label from Darknet53 output"""
+    preds_n = np.array(preds)
+    n, c, h, w = preds_n.shape
+    anchor_num = len(anchors) // 2
+    preds_n = preds_n.reshape([n, anchor_num, class_num + 5, h, w]) \
+                     .transpose((0, 1, 3, 4, 2))
+    preds_n[:, :, :, :, :2] = sigmoid(preds_n[:, :, :, :, :2])
+    preds_n[:, :, :, :, 4:] = sigmoid(preds_n[:, :, :, :, 4:])
+
+    pred_boxes = preds_n[:, :, :, :, :4]
+    pred_confs = preds_n[:, :, :, :, 4]
+    pred_scores = preds_n[:, :, :, :, 5:] * np.expand_dims(pred_confs, axis=4)
+
+    grid_x = np.tile(np.arange(w).reshape((1, w)), (h, 1))
+    grid_y = np.tile(np.arange(h).reshape((h, 1)), (1, w))
+    anchors = [(anchors[i], anchors[i+1]) for i in range(0, len(anchors), 2)]
+    anchors_s = np.array([(an_w * w / img_width, an_h * h / img_height) for an_w, an_h in anchors])
+    anchor_w = anchors_s[:, 0:1].reshape((1, anchor_num, 1, 1))
+    anchor_h = anchors_s[:, 1:2].reshape((1, anchor_num, 1, 1))
+
+    pred_boxes[:, :, :, :, 0] += grid_x
+    pred_boxes[:, :, :, :, 1] += grid_y
+    pred_boxes[:, :, :, :, 2] = np.exp(pred_boxes[:, :, :, :, 2]) * anchor_w
+    pred_boxes[:, :, :, :, 3] = np.exp(pred_boxes[:, :, :, :, 3]) * anchor_h
+    
+    pred_boxes[:, :, :, :, 0] = pred_boxes[:, :, :, :, 0] * img_width / w
+    pred_boxes[:, :, :, :, 1] = pred_boxes[:, :, :, :, 1] * img_height / h
+    pred_boxes[:, :, :, :, 2] = pred_boxes[:, :, :, :, 2] * img_width / w
+    pred_boxes[:, :, :, :, 3] = pred_boxes[:, :, :, :, 3] * img_height / h
+
+    pred_boxes = box_xywh_to_xyxy(pred_boxes)
+    pred_boxes = np.tile(np.expand_dims(pred_boxes, axis=4), (1, 1, 1, 1, class_num, 1))
+    pred_labels = np.zeros_like(pred_scores) + np.arange(class_num)
+
+    return (
+            pred_boxes.reshape((n, -1, 4)), 
+            pred_scores.reshape((n, -1)),
+            pred_labels.reshape((n, -1)), 
+            )
+
+def get_all_yolo_pred(outputs, yolo_anchors, yolo_classes, input_shape):    
+    all_pred_boxes = []
+    all_pred_scores = []
+    all_pred_labels = []
+    for output, anchors, classes in zip(outputs, yolo_anchors, yolo_classes):
+        pred_boxes, pred_scores, pred_labels = get_yolo_detection(output, anchors, classes, input_shape[0], input_shape[1])
+        # preds = np.concatenate([pred_boxes, np.expand_dims(pred_scores, 2), np.expand_dims(pred_labels, 2)], axis=2)
+        # f = open("output.txt", 'w')
+        # f.write(str(preds.shape) + "\n")
+        # f.write(str(preds))
+        # f.close()
+        all_pred_boxes.append(pred_boxes)
+        all_pred_labels.append(pred_labels)
+        all_pred_scores.append(pred_scores)
+    pred_boxes = np.concatenate(all_pred_boxes, axis=1)
+    pred_scores = np.concatenate(all_pred_scores, axis=1)
+    pred_labels = np.concatenate(all_pred_labels, axis=1)
+
+    return (pred_boxes, pred_scores, pred_labels)
+
+def calc_nms_box_new(pred_boxes, pred_scores, pred_labels, valid_thresh=0.01, nms_thresh=0.4, nms_topk=400, nms_posk=100):
+    output_boxes = np.empty((0, 4))
+    output_scores = np.empty(0)
+    output_labels = np.empty(0)
+    for boxes, labels, scores in zip(pred_boxes, pred_labels, pred_scores):
+        valid_mask = scores > valid_thresh
+        boxes = boxes[valid_mask]
+        scores = scores[valid_mask]
+        labels = labels[valid_mask]
+
+        score_sort_index = np.argsort(scores)[::-1]
+        boxes = boxes[score_sort_index][:nms_topk]
+        scores = scores[score_sort_index][:nms_topk]
+        labels = labels[score_sort_index][:nms_topk]
+
+        for c in np.unique(labels):
+            c_mask = labels == c
+            c_boxes = boxes[c_mask]
+            c_scores = scores[c_mask]
+
+            detect_boxes = []
+            detect_scores = []
+            detect_labels = []
+            while c_boxes.shape[0]:
+                detect_boxes.append(c_boxes[0])
+                detect_scores.append(c_scores[0])
+                detect_labels.append(c)
+                if c_boxes.shape[0] == 1:
+                    break
+                iou = box_iou_xyxy(detect_boxes[-1].reshape((1, 4)), c_boxes[1:])
+                c_boxes = c_boxes[1:][iou < nms_thresh]
+                c_scores = c_scores[1:][iou < nms_thresh]
+
+            output_boxes = np.append(output_boxes, detect_boxes, axis=0)
+            output_scores = np.append(output_scores, detect_scores)
+            output_labels = np.append(output_labels, detect_labels)
+    return (output_boxes, output_scores, output_labels)
+
+
 def calc_nms_box(pred_boxes, pred_confs, pred_labels, im_shape, input_size, valid_thresh=0.8, nms_thresh=0.4, nms_topk=400, nms_posk=100):
     """
     Removes detections which confidence score under conf_thresh and perform 
@@ -234,13 +280,14 @@ def calc_nms_box(pred_boxes, pred_confs, pred_labels, im_shape, input_size, vali
             detect_labels = []
             while c_boxes_s.shape[0]:
                 detect_boxes.append(c_boxes_s[0])
-                detect_scores.append(c_confs_s[0])
+                detect_scores.append(c_scores_s[0])
                 detect_labels.append(c)
                 if c_boxes_s.shape[0] == 1:
                     break
                 iou = box_iou_xyxy(detect_boxes[-1].reshape((1, 4)), c_boxes_s[1:])
                 c_boxes_s = c_boxes_s[1:][iou < nms_thresh]
                 c_confs_s = c_confs_s[1:][iou < nms_thresh]
+                c_scores_s = c_scores_s[1:][iou < nms_thresh]
 
             output_boxes = np.append(output_boxes, detect_boxes, axis=0)
             output_scores = np.append(output_scores, detect_scores)

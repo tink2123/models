@@ -1,4 +1,9 @@
 *.pyc
+*.swp
+*.log
+*.json
+*.jpg
+*.png
 output/
 test/
 checkpoints/
@@ -6,10 +11,5 @@ weights/
 !weights/*.py
 !weights/*.sh
 dataset/coco/
-*.swp
-*.log
 log*
 output*
-*.json
-*.jpg
-*.png
