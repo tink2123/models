@@ -19,7 +19,11 @@ from __future__ import print_function
 from __future__ import unicode_literals
 
 import numpy as np
-from PIL import Image, ImageDraw
+
+import matplotlib
+matplotlib.use('Agg')
+from matplotlib import pyplot as plt
+from PIL import Image
 
 
 def sigmoid(x):
@@ -171,17 +175,23 @@ def box_iou_xyxy(box1, box2):
 def rescale_box_in_input_image(boxes, im_shape, input_size):
     """Scale (x1, x2, y1, y2) box of yolo output to input image"""
     h, w = im_shape
-    max_dim = max(h , w)
-    boxes = boxes * max_dim / input_size
-    dim_diff = np.abs(h - w)
-    pad = dim_diff // 2
-    if h <= w:
-        boxes[:, 1] -= pad
-        boxes[:, 3] -= pad
-    else:
-        boxes[:, 0] -= pad
-        boxes[:, 2] -= pad
-    boxes[boxes<0] == 0
+    # max_dim = max(h , w)
+    # boxes = boxes * max_dim / input_size
+    # dim_diff = np.abs(h - w)
+    # pad = dim_diff // 2
+    # if h <= w:
+    #     boxes[:, 1] -= pad
+    #     boxes[:, 3] -= pad
+    # else:
+    #     boxes[:, 0] -= pad
+    #     boxes[:, 2] -= pad
+    fx = w / input_size
+    fy = h / input_size
+    boxes[:, 0] *= fx
+    boxes[:, 1] *= fy
+    boxes[:, 2] *= fx
+    boxes[:, 3] *= fy
+    boxes[boxes<0] = 0
     return boxes
 
 def calc_nms_box(pred_boxes, pred_confs, pred_labels, im_shape, input_size, valid_thresh=0.8, nms_thresh=0.4, nms_topk=400, nms_posk=100):
@@ -192,7 +202,7 @@ def calc_nms_box(pred_boxes, pred_confs, pred_labels, im_shape, input_size, vali
     _, box_num, class_num = pred_labels.shape
     pred_boxes = box_xywh_to_xyxy(pred_boxes)
     output_boxes = np.empty((0, 4))
-    output_confs = np.empty(0)
+    output_scores = np.empty(0)
     output_labels = np.empty((0))
     for i, (boxes, confs, classes) in enumerate(zip(pred_boxes, pred_confs, pred_labels)):
         conf_mask = confs > valid_thresh
@@ -217,13 +227,14 @@ def calc_nms_box(pred_boxes, pred_confs, pred_labels, im_shape, input_size, vali
             c_score_index = np.argsort(c_scores)
             c_boxes_s = c_boxes[c_score_index[::-1]]
             c_confs_s = c_confs[c_score_index[::-1]]
+            c_scores_s = c_scores[c_score_index[::-1]]
 
             detect_boxes = []
-            detect_confs = []
+            detect_scores = []
             detect_labels = []
             while c_boxes_s.shape[0]:
                 detect_boxes.append(c_boxes_s[0])
-                detect_confs.append(c_confs_s[0])
+                detect_scores.append(c_confs_s[0])
                 detect_labels.append(c)
                 if c_boxes_s.shape[0] == 1:
                     break
@@ -232,29 +243,48 @@ def calc_nms_box(pred_boxes, pred_confs, pred_labels, im_shape, input_size, vali
                 c_confs_s = c_confs_s[1:][iou < nms_thresh]
 
             output_boxes = np.append(output_boxes, detect_boxes, axis=0)
-            output_confs = np.append(output_confs, detect_confs)
+            output_scores = np.append(output_scores, detect_scores)
             output_labels = np.append(output_labels, detect_labels)
     
     output_boxes = output_boxes[:nms_posk]
-    output_confs = output_confs[:nms_posk]
+    output_scores = output_scores[:nms_posk]
     output_labels = output_labels[:nms_posk]
 
     output_boxes = rescale_box_in_input_image(output_boxes, im_shape, input_size)
-    return (output_boxes, output_confs, output_labels)
+    return (output_boxes, output_scores, output_labels)
 
-def draw_boxes_on_image(image_path, boxes, confs, labels, label_names, conf_thresh=0.5):
-    image = Image.open(image_path)
-    draw = ImageDraw.Draw(image)
+def draw_boxes_on_image(image_path, boxes, scores, labels, label_names, score_thresh=0.5):
+
+    image = np.array(Image.open(image_path))
+    plt.figure()
+    _, ax = plt.subplots(1)
+    ax.imshow(image)
 
     image_name = image_path.split('/')[-1]
     print("Image {} detect: ".format(image_name))
-    for box, conf, label in zip(boxes, confs, labels):
-        if conf < conf_thresh:
+    colors = {}
+    for box, score, label in zip(boxes, scores, labels):
+        if score < score_thresh:
             continue
+        label = int(label)
+        if label not in colors:
+            colors[label] = plt.get_cmap('hsv')(label / len(label_names))
         x1, y1, x2, y2 = box[0], box[1], box[2], box[3]
-        draw.rectangle((x1, y1, x2, y2), outline='red')
-        if image.mode == 'RGB':
-            draw.text((x1, y1), "{} {:.4f}".format(label_names[int(label)], conf), (255, 255, 0))
-        print("\t {:15s} at {:25} score: {:.5f}".format(label_names[int(label)], map(int, list(box)), conf))
-    image.save("./output/" + image_name)
+        rect = plt.Rectangle((x1, y1), x2 - x1, y2 - y1, 
+                            fill=False, linewidth=2.0, 
+                            edgecolor=colors[label])
+        ax.add_patch(rect)
+        ax.text(x1, y1, '{} {:.4f}'.format(label_names[label], score), 
+                verticalalignment='bottom', horizontalalignment='left',
+                bbox={'facecolor': colors[label], 'alpha': 0.5, 'pad': 0},
+                fontsize=8, color='white')
+        print("\t {:15s} at {:25} score: {:.5f}".format(label_names[int(label)], map(int, list(box)), score))
+    image_name = image_name.replace('jpg', 'png')
+    plt.axis('off')
+    plt.gca().xaxis.set_major_locator(plt.NullLocator())
+    plt.gca().yaxis.set_major_locator(plt.NullLocator())
+    plt.savefig("./output/{}".format(image_name), bbox_inches='tight', pad_inches=0.0)
+    print("Detect result save at ./output/{}\n".format(image_name))
+    plt.cla()
+    plt.close('all')
 

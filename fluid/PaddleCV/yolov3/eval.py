@@ -97,18 +97,18 @@ def eval():
             im_shape = data[2]
             pred_boxes, pred_confs, pred_labels = box_utils.get_all_yolo_pred(
                     batch_outputs, yolo_anchors, yolo_classes, (input_size, input_size))
-            boxes, confs, labels = box_utils.calc_nms_box(pred_boxes, pred_confs, pred_labels,
+            boxes, scores, labels = box_utils.calc_nms_box(pred_boxes, pred_confs, pred_labels,
                                                     im_shape, input_size, cfg.conf_thresh,
                                                     cfg.TEST.nms_thresh)
             im_shape = data[2]
-            dts_res += get_pred_result(boxes, confs, labels, im_id)
+            dts_res += get_pred_result(boxes, scores, labels, im_id)
             end_time = time.time()
             print("batch id: {}, time: {}".format(batch_id, end_time - start_time))
             total_time += (end_time - start_time)
 
             if cfg.debug:
                 img_name = "COCO_val2014_{:012d}.jpg".format(im_id)
-                box_utils.draw_boxes_on_image(os.path.join("./dataset/coco/images/val2014", img_name), boxes, confs, labels, label_names)
+                box_utils.draw_boxes_on_image(os.path.join("./dataset/coco/images/val2014", img_name), boxes, scores, labels, label_names)
 
     with open("yolov3_result.json", 'w') as outfile:
         json.dump(dts_res, outfile)

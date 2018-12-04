@@ -61,24 +61,28 @@ def read_img_data(img_path, img_size, mean=[0.485, 0.456, 0.406], std=[0.229, 0.
     # dim_diff = np.abs(h - w)
     # pad1, pad2 = dim_diff // 2, dim_diff - dim_diff // 2
     # pad = ((pad1, pad2), (0, 0), (0, 0)) if h <= w else ((0, 0), (pad1, pad2), (0, 0))
-    # img = np.pad(img, pad, 'constant', constant_values=128.0)
+    # img = np.pad(img, pad, 'constant', constant_values=128.0) / 255.0
     # padded_h, padded_w, _ = img.shape
     # out_img = resize(img, (img_size, img_size, 3), mode='reflect')
     # im_scale = img_size / float(padded_h)
-    im_scale = img_size / float(max(h, w))
-    out_img = cv2.resize(img, None, None, fx=im_scale, fy=im_scale, interpolation=cv2.INTER_LINEAR) / 255.0
+    # im_scale = img_size / float(max(h, w))
+    im_scale_x = img_size / float(w)
+    im_scale_y = img_size / float(h)
+    out_img = cv2.resize(img, None, None, fx=im_scale_x, fy=im_scale_y, interpolation=cv2.INTER_LINEAR) / 255.0
     mean = np.array(mean).reshape((1, 1, -1))
     std = np.array(std).reshape((1, 1, -1))
     out_img = (out_img - mean) / std
-    scale_h, scale_w, _ = out_img.shape
-    dim_diff = np.abs(scale_h - scale_w)
-    pad1, pad2 = dim_diff // 2, dim_diff - dim_diff // 2
-    pad = ((pad1, pad2), (0, 0), (0, 0)) if h <= w else ((0, 0), (pad1, pad2), (0, 0))
-    out_img = np.pad(out_img, pad, 'constant', constant_values=0.0)
+    # scale_h, scale_w, _ = out_img.shape
+    # dim_diff = np.abs(scale_h - scale_w)
+    # pad1, pad2 = dim_diff // 2, dim_diff - dim_diff // 2
+    # pad = ((pad1, pad2), (0, 0), (0, 0)) if h <= w else ((0, 0), (pad1, pad2), (0, 0))
+    # out_img = np.pad(out_img, pad, 'constant', constant_values=0.0)
     out_img = out_img.transpose((2, 0, 1))
+    # print(out_img.shape)
 
     # return out_img, h, w, pad, padded_h, padded_w
-    return out_img, h, w, pad, max(h, w), max(h, w)
+    # return out_img, h, w, pad, max(h, w), max(h, w)
+    return out_img, h, w, (0), max(h, w), max(h, w)
 
 
 class CocoDataset(object):

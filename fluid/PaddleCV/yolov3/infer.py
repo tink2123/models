@@ -50,11 +50,11 @@ def infer():
 
     pred_boxes, pred_confs, pred_labels = box_utils.get_all_yolo_pred(outputs, yolo_anchors,
                                                         yolo_classes, (input_size, input_size))
-    boxes, confs, labels = box_utils.calc_nms_box(pred_boxes, pred_confs, pred_labels, 
+    boxes, scores, labels = box_utils.calc_nms_box(pred_boxes, pred_confs, pred_labels, 
                                     im_shape, input_size, cfg.conf_thresh, 
                                     cfg.TEST.nms_thresh)
     path = os.path.join(cfg.image_path, cfg.image_name)
-    box_utils.draw_boxes_on_image(path, boxes, confs, labels, label_names)
+    box_utils.draw_boxes_on_image(path, boxes, scores, labels, label_names)
 
 
 if __name__ == '__main__':
