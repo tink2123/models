@@ -24,7 +24,6 @@ import copy
 import cv2
 from pycocotools.coco import COCO
 
-# from coco_reader import *
 from config.config import cfg
 
 
@@ -148,12 +147,15 @@ class DataSetReader(object):
         def img_reader(img, size, mean, std):
             im_path = img['image']
             im = cv2.imread(im_path).astype('float32')
+            im = cv2.cvtColor(im, cv2.COLOR_BGR2RGB)
             im_shape = (size, size)
 
             h, w, _ = im.shape
             im_scale_x = size / float(w)
             im_scale_y = size / float(h)
             out_img = cv2.resize(im, None, None, fx=im_scale_x, fy=im_scale_y, interpolation=cv2.INTER_CUBIC)
+            # with open("resize.txt", 'w') as f:
+            #     f.write(str(out_img.reshape((-1, 1))))
             mean = np.array(mean).reshape((1, 1, -1))
             std = np.array(std).reshape((1, 1, -1))
             out_img = (out_img / 255.0 - mean) / std

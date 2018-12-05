@@ -186,9 +186,12 @@ def get_all_yolo_pred(outputs, yolo_anchors, yolo_classes, input_shape):
     all_pred_scores = []
     all_pred_labels = []
     for output, anchors, classes in zip(outputs, yolo_anchors, yolo_classes):
+        # with open('output{}.txt'.format(output.shape[-1]), 'w') as f:
+        #     f.write(str(output.shape) + "\n")
+        #     f.write(str(output.reshape((-1, 1))))
         pred_boxes, pred_scores, pred_labels = get_yolo_detection(output, anchors, classes, input_shape[0], input_shape[1])
         # preds = np.concatenate([pred_boxes, np.expand_dims(pred_scores, 2), np.expand_dims(pred_labels, 2)], axis=2)
-        # f = open("output.txt", 'w')
+        # f = open("output{}.txt".format(output.shape[-1]), 'w')
         # f.write(str(preds.shape) + "\n")
         # f.write(str(preds))
         # f.close()
