@@ -30,7 +30,7 @@ def sigmoid(x):
     """Perform sigmoid to input numpy array"""
     return 1.0 / (1.0 + np.exp(-1.0 * x))
 
-def coco_anno_box_to_center_relative(box, img_width, img_height):
+def coco_anno_box_to_center_relative(box, img_height, img_width):
     """
     Convert COCO annotations box with format [x1, y1, w, h] to 
     center mode [center_x, center_y, w, h] and divide image width
@@ -44,10 +44,10 @@ def coco_anno_box_to_center_relative(box, img_width, img_height):
     y1 = max(y, 0)
     y2 = min(y + h, img_height - 1)
 
-    x = (x1 + x2) // 2 // (img_width - 1)
-    y = (y1 + y2) // 2 // (img_height - 1)
-    w = (x2 - x1) // (img_width - 1)
-    h = (y2 - y1) // (img_height - 1)
+    x = (x1 + x2) / 2 / img_width
+    y = (y1 + y2) / 2 / img_height
+    w = (x2 - x1) / img_width
+    h = (y2 - y1) / img_height
 
     return np.array([x, y, w, h])
 

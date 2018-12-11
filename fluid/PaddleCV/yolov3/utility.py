@@ -107,7 +107,8 @@ def parse_args():
     add_arg('use_profile',         bool,   False,       "Whether use profiler.")
     #SOLVER
     add_arg('learning_rate',    float,  0.001,     "Learning rate.")
-    add_arg('max_iter',         int,    10000000,   "Iter number.")
+    add_arg('max_iter',         int,    1000000,   "Iter number.")
+    add_arg('snapshot_stride',  int,    1000,    "save model every snapshot stride.")
     add_arg('log_window',       int,    20,        "Log smooth window, set 1 for debug, set 20 for train.")
     # TRAIN TEST INFER
     add_arg('im_per_batch',       int,   1,        "Minibatch size.")
@@ -116,7 +117,6 @@ def parse_args():
     add_arg('nms_topk',    int, 400,    "The number of boxes to perform NMS.")
     add_arg('nms_posk',    int, 100,    "The number of boxes of NMS output.")
     add_arg('conf_thresh',    float, 0.5,    "confidence, score threshold for NMS.")
-    add_arg('snapshot_stride',  int,    2000,    "save model every snapshot stride.")
     add_arg('debug',            bool,   False,   "Debug mode")
     # SINGLE EVAL AND DRAW
     add_arg('image_path',       str,   'image',  "The image path used to inference and visualize.")

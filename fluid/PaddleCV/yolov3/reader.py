@@ -20,10 +20,11 @@ from __future__ import unicode_literals
 
 import numpy as np
 import os
+import random
 import copy
 import cv2
+import box_utils
 from pycocotools.coco import COCO
-
 from config.config import cfg
 
 
@@ -87,18 +88,21 @@ class DataSetReader(object):
         anno = self.COCO.loadAnns(self.COCO.getAnnIds(imgIds=img['id'], iscrowd=None))
         gt_index = 0
         for target in anno:
-            if target['area'] < cfg.TRAIN.get_min_area:
+            if target['area'] < cfg.TRAIN.gt_min_area:
                 continue
-            if obj.has_key('ignore') and obj['ignore']:
+            if target.has_key('ignore') and target['ignore']:
                 continue
 
             box = box_utils.coco_anno_box_to_center_relative(target['bbox'], img_height, img_width)
             if box[2] <= 0 and box[3] <= 0:
                 continue
 
-            img['gt_id'] = np.append(img['gt_id'], np.int32(target['id']))
-            img['gt_boxes'] = np.append(img['gt_boxes'], axis=0)
-            img['gt_labels'] = np.append(img['gt_labels'], self.category_to_id_map[target['category_id']]) 
+            img['gt_id'][gt_index] = np.int32(target['id'])
+            img['gt_boxes'][gt_index] = box
+            img['gt_labels'][gt_index] = self.category_to_id_map[target['category_id']]
+            gt_index += 1
+            if gt_index >= cfg.max_box_num:
+                break
 
     def _filter_imgs_by_valid_box(self, imgs):
         """Exclude images with no ground truth box"""
@@ -112,13 +116,14 @@ class DataSetReader(object):
         image_ids = self.COCO.getImgIds()
         image_ids.sort()
         imgs = copy.deepcopy(self.COCO.loadImgs(image_ids))
+        # imgs = imgs[:8]
         for img in imgs:
             img['image'] = os.path.join(self.img_dir, img['file_name'])
             assert os.path.exists(img['image']), \
                     "image {} not found.".format(img['image'])
-            img['gt_id'] = np.empty((0), dtype=np.int32)
-            img['gt_boxes'] = np.empty((0, 4), dtype=np.float32)
-            img['gt_labels'] = np.empty((0), dtype=np.int32)
+            img['gt_id'] = np.zeros((10), dtype=np.int32)
+            img['gt_boxes'] = np.zeros((10, 4), dtype=np.float32)
+            img['gt_labels'] = np.zeros((10), dtype=np.int32)
             for k in ['date_captured', 'url', 'license', 'file_name']:
                 if img.has_key(k):
                     del img[k]
@@ -144,16 +149,28 @@ class DataSetReader(object):
             self._parse_dataset_dir(mode)
             self._parse_dataset_catagory()
 
-        def img_reader(img, size, mean, std):
+        def img_reader(mode, img, size, mean, std):
             im_path = img['image']
             im = cv2.imread(im_path).astype('float32')
             im = cv2.cvtColor(im, cv2.COLOR_BGR2RGB)
             im_shape = (size, size)
 
+            if mode == 'train':
+                interp_method = [
+                    cv2.INTER_NEAREST,
+                    cv2.INTER_LINEAR,
+                    cv2.INTER_AREA,
+                    cv2.INTER_CUBIC,
+                    cv2.INTER_LANCZOS4,
+                    ]
+            else:
+              interp_method = [cv2.INTER_CUBIC]
+            interp = interp_method[random.randint(0, len(interp_method) - 1)]
+
             h, w, _ = im.shape
             im_scale_x = size / float(w)
             im_scale_y = size / float(h)
-            out_img = cv2.resize(im, None, None, fx=im_scale_x, fy=im_scale_y, interpolation=cv2.INTER_CUBIC)
+            out_img = cv2.resize(im, None, None, fx=im_scale_x, fy=im_scale_y, interpolation=interp)
             # with open("resize.txt", 'w') as f:
             #     f.write(str(out_img.reshape((-1, 1))))
             mean = np.array(mean).reshape((1, 1, -1))
@@ -175,24 +192,29 @@ class DataSetReader(object):
                     imgs = np.random.permutation(imgs)
                 read_cnt = 0
                 batch_out = []
+                # img_ids = []
                 while True:
                     img = imgs[read_cnt % len(imgs)]
                     read_cnt += 1
-                    if read_cnt % len(imgs) == 0:
+                    if read_cnt % len(imgs) == 0 and shuffle:
                         imgs = np.random.permutation(imgs)
-                    im, im_id, im_shape = img_reader(img, size, cfg.pixel_means, cfg.pixel_stds)
+                    im, im_id, im_shape = img_reader(mode, img, size, cfg.pixel_means, cfg.pixel_stds)
                     gt_boxes, gt_labels = gt_reader(img)
-                    batch_out.append((im, gt_boxes, gt_labels, im_id, im_shape))
+                    # random_jitter_gt(im, gtboxes)
+                    batch_out.append((im, gt_boxes, gt_labels))
+                    # img_ids.append(img['id'])
 
                     if len(batch_out) == batch_size:
+                        # print("img_ids: ", img_ids)
                         yield batch_out
                         batch_out = []
+                        # img_ids = []
 
             elif mode == 'test':
                 imgs = self._parse_images_by_mode(mode)
                 batch_out = []
                 for img in imgs:
-                    im, im_id, im_shape = img_reader(img, size, cfg.pixel_means, cfg.pixel_stds)
+                    im, im_id, im_shape = img_reader(mode, img, size, cfg.pixel_means, cfg.pixel_stds)
                     batch_out.append((im, im_id, im_shape))
                     if len(batch_out) == batch_size:
                         yield batch_out
@@ -203,7 +225,7 @@ class DataSetReader(object):
                 img = {}
                 img['image'] = image
                 img['id'] = 0
-                im, im_id, im_shape = img_reader(img, size, cfg.pixel_means, cfg.pixel_stds)
+                im, im_id, im_shape = img_reader(mode, img, size, cfg.pixel_means, cfg.pixel_stds)
                 batch_out = [(im, im_id, im_shape)]
                 yield batch_out
 

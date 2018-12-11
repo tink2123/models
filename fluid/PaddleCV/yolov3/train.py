@@ -44,6 +44,8 @@ def train():
     loss = model.loss()
     loss.persistable = True
 
+    # fluid.clip.set_gradient_clip(clip=fluid.clip.GradientClipByValue(max=10.0, min=-10.0))
+
     hyperparams = model.get_hyperparams()
     devices = os.getenv("CUDA_VISIBLE_DEVICES") or ""
     devices_num = len(devices.split(","))
@@ -73,6 +75,11 @@ def train():
     base_exe.run(fluid.default_startup_program())
     # fluid.io.save_persistables(exe, "./test")
 
+    for var in fluid.default_main_program().list_vars():
+        if var.name.find("conv2d.output.1.tmp_1@GRAD") >= 0 and var.name[:7] in ["conv81.", "conv93.", "conv105"]:
+            var.persistable = True
+            print(var)
+
     if cfg.pretrain_base:
         def if_exist(var):
             return os.path.exists(os.path.join(cfg.pretrain_base, var.name))
@@ -92,7 +99,8 @@ def train():
     #     py_reader = model.py_reader
     #     py_reader.decorate_paddle_reader(train_reader)
     input_size = model.get_input_size()
-    train_reader = reader.train(input_size, batch_size=int(hyperparams['batch']) / 2, shuffle=True)
+    train_reader = reader.train(input_size, batch_size=int(hyperparams['batch']) / 2, shuffle=False)
+    # train_reader = reader.train(input_size, 8, shuffle=False)
     feeder = fluid.DataFeeder(place=place, feed_list=model.feeds())
 
     def save_model(postfix):
@@ -122,8 +130,7 @@ def train():
                               .get_tensor())
                 print("Iter {:d}, lr {:.6f}, loss {:.6f}, time {:.5f}".format(
                     iter_id, lr[0],
-                    smoothed_loss.get_median_value(
-                    ), start_time - prev_start_time))
+                    smoothed_loss.get_median_value(), start_time - prev_start_time))
                 sys.stdout.flush()
                 if (iter_id + 1) % cfg.TRAIN.snapshot_iter == 0:
                     save_model("model_iter{}".format(iter_id))
@@ -142,8 +149,14 @@ def train():
             start_time = time.time()
             losses = exe.run(fetch_list=[v.name for v in fetch_list],
                                    feed=feeder.feed(data))
+            # print("losses: ", losses)
             # loss106 = np.array(fluid.global_scope().find_var("yolo_loss106").get_tensor())
+            # loss82_in = np.array(fluid.global_scope().find_var("conv81.conv2d.output.1.tmp_1").get_tensor())
             # loss94_in = np.array(fluid.global_scope().find_var("conv93.conv2d.output.1.tmp_1").get_tensor())
+            # loss106_in = np.array(fluid.global_scope().find_var("conv105.conv2d.output.1.tmp_1").get_tensor())
+            # yolo_grad82 = np.array(fluid.global_scope().find_var("yolo_loss82@GRAD").get_tensor())
+            # yolo_grad94 = np.array(fluid.global_scope().find_var("yolo_loss94@GRAD").get_tensor())
+            # yolo_grad106 = np.array(fluid.global_scope().find_var("yolo_loss106@GRAD").get_tensor())
             # upsample = np.array(fluid.global_scope().find_var("upsample85.tmp_0").get_tensor())
             # concat = np.array(fluid.global_scope().find_var("concat_0.tmp_0").get_tensor())
             # concat_in = np.array(fluid.global_scope().find_var("leaky_relu_56.tmp_0").get_tensor())
@@ -152,18 +165,27 @@ def train():
             # bn0 = np.array(fluid.global_scope().find_var("bn0.output.tmp_2").get_tensor())
             # leaky0 = np.array(fluid.global_scope().find_var("leaky_relu_0.tmp_0").get_tensor())
             # res4 = np.array(fluid.global_scope().find_var("res4").get_tensor())
-            # print("Iter: ", iter_id)
             # print("img: ", img.shape, img.sum(), np.isnan(img).sum())
             # print("conv0: ", conv0.shape, conv0.sum(), np.isnan(conv0).sum())
             # print("bn0: ", bn0.shape, bn0.sum(), np.isnan(bn0).sum())
             # print("leaky0: ", leaky0.shape, leaky0.sum(), np.isnan(leaky0).sum())
+            # loss82_in.tofile("./output/yolo_input1_{:04d}".format(iter_id))
+            # loss94_in.tofile("./output/yolo_input2_{:04d}".format(iter_id))
+            # loss106_in.tofile("./output/yolo_input3_{:04d}".format(iter_id))
+            # save_model("model_iter{}".format(iter_id))
+            # yolo_grad1 = np.array(fluid.global_scope().find_var("conv81.conv2d.output.1.tmp_1@GRAD").get_tensor())
+            # yolo_grad2 = np.array(fluid.global_scope().find_var("conv93.conv2d.output.1.tmp_1@GRAD").get_tensor())
+            yolo_grad3 = np.array(fluid.global_scope().find_var("conv105.conv2d.output.1.tmp_1@GRAD").get_tensor())
+            # yolo_grad1.tofile("./output/yolo_grad1_{:04d}".format(iter_id))
+            # yolo_grad2.tofile("./output/yolo_grad2_{:04d}".format(iter_id))
+            # yolo_grad3.tofile("./output/yolo_grad3_{:04d}".format(iter_id))
+            print("yolo_grad3 nan: {}, max: {}".format(np.isnan(yolo_grad3).sum(), np.max(yolo_grad3)))
             every_pass_loss.append(losses[0])
             smoothed_loss.add_value(losses[0])
             lr = np.array(fluid.global_scope().find_var('learning_rate')
                           .get_tensor())
-            print("Iter {:d}, lr {:.6f}, loss {:.6f}, time {:.5f}".format(
-                iter_id, lr[0], 
-                smoothed_loss.get_median_value(), start_time - prev_start_time))
+            print("Iter {:d}, lr: {:.6f}, loss: {:.4f}, time {:.5f}".format(
+                iter_id, lr[0], smoothed_loss.get_median_value(), start_time - prev_start_time))
             sys.stdout.flush()
 
             if (iter_id + 1) % cfg.TRAIN.snapshot_iter == 0:

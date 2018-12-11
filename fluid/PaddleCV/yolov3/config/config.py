@@ -47,12 +47,12 @@ _C.TRAIN.fg_thresh = 0.5
 _C.TRAIN.bg_thresh_hi = 0.5
 _C.TRAIN.bg_thresh_lo = 0.0
 
-# If False, only resize image and not pad, image shape is different between
-# GPUs in one mini-batch. If True, image shape is the same in one mini-batch.
-_C.TRAIN.padding_minibatch = False
-
 # Snapshot period
-_C.TRAIN.snapshot_iter = 2000
+_C.TRAIN.snapshot_iter = 1000
+# _C.TRAIN.snapshot_iter = 100
+
+# min valid area for gt boxes
+_C.TRAIN.gt_min_area = -1
 
 # max target box number in an image
 _C.TRAIN.max_box_num = 10
@@ -115,13 +115,16 @@ _C.learning_rate = 0.001
 
 # maximum number of iterations
 _C.max_iter = 1000000
+# _C.max_iter = 500
 
 # warm up to learning rate 
 _C.warm_up_iter = 4000
+# _C.warm_up_iter = 100
 _C.warm_up_factor = 0.
 
 # lr steps_with_decay
 _C.lr_steps = [800000, 900000]
+# _C.lr_steps = [200, 300]
 _C.lr_gamma = 0.1
 
 # L2 regularization hyperparameter

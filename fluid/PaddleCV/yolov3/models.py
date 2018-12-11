@@ -116,7 +116,6 @@ class YOLOv3(object):
         self.yolo_anchors = []
         self.yolo_classes = []
         self.outputs = []
-        self.losses = []
         for i, layer_def in enumerate(model_defs):
             if layer_def['type'] == 'convolutional':
                 bn = layer_def.get('batch_normalize', 0)
@@ -172,6 +171,7 @@ class YOLOv3(object):
             elif layer_def['type'] == 'yolo':
                 self.yolo_layer_defs.append(layer_def)
                 self.outputs.append(out)
+                out.persistable = True
 
                 anchor_idxs = map(int, layer_def['mask'].split(','))
                 all_anchors = map(int, layer_def['anchors'].split(','))
@@ -192,8 +192,9 @@ class YOLOv3(object):
                             anchors=anchors,
                             class_num=class_num,
                             ignore_thresh=ignore_thresh,
+                            input_size=int(self.hyperparams['height']),
                             name="yolo_loss"+str(i))
-                    self.losses.append(loss)
+                    self.losses.append(fluid.layers.reduce_mean(loss))
 
             layer_outputs.append(out)
 
@@ -209,30 +210,6 @@ class YOLOv3(object):
     def get_yolo_classes(self):
         return self.yolo_classes
 
-    # def get_pred(self):
-    #     all_pred_boxes = []
-    #     all_pred_confs = []
-    #     all_pred_labels = []
-    #     for layer_def, output in zip(self.yolo_layer_defs, self.outputs):
-    #         print(output)
-    #         class_num = layer_def['classes']
-    #         all_anchors = map(float, layer_def['anchors'].split(','))
-    #         anchor_idxs = map(int, layer_def['mask'].split(','))
-    #         anchors = [[] for _ in range(len(anchor_idxs))]
-    #         for i, anchor_idx in enumerate(anchor_idxs):
-    #             anchors[i].append(all_anchors[anchor_idx * 2])
-    #             anchors[i].append(all_anchors[anchor_idx * 2 + 1])
-    #         pred_boxes, pred_confs, pred_labels = box_utils.get_yolo_detection(output, anchors, class_num, self.img_width, self.img_height)
-    #         all_pred_boxes.append(pred_boxes)
-    #         all_pred_confs.append(pred_confs)
-    #         all_pred_labels.append(pred_labels)
-    #
-    #     return (
-    #         fluid.layers.concat(all_pred_boxes, axis=1),
-    #         fluid.layers.concat(all_pred_confs, axis=1),
-    #         fluid.layers.concat(all_pred_labels, axis=1),
-    #         )
-
     def build_input(self):
         self.image_shape = (3, int(self.hyperparams['height']), int(self.hyperparams['width']))
         self.image = fluid.layers.data(
@@ -247,15 +224,12 @@ class YOLOv3(object):
                 )
         self.im_shape = fluid.layers.data(
                 name="im_shape", shape=[2], dtype='int32')
-        # self.im_scale = fluid.layers.data(
-        #         name="im_scale", shape=[1], dtype='float32')
         self.im_id = fluid.layers.data(
                 name="im_id", shape=[1], dtype='int32')
     
     def feeds(self):
         if not self.is_train:
             return [self.image, self.im_id, self.im_shape]
-            # return [self.image, self.im_id, self.im_scale]
         return [self.image, self.gtbox, self.gtlabel]
 
     def get_hyperparams(self):
