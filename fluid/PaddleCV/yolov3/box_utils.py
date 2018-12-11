@@ -140,6 +140,31 @@ def rescale_box_in_input_image(boxes, im_shape, input_size):
     boxes[boxes<0] = 0
     return boxes
 
+def box_crop(boxes, labels, crop, img_shape):
+    x, y, w, h = map(float, crop)
+    im_w, im_h = map(float, img_shape)
+
+    boxes = boxes.copy()
+    boxes[:, 0], boxes[:, 2] = (boxes[:, 0] - boxes[:, 2] / 2) * im_w, (boxes[:, 0] + boxes[:, 2] / 2) * im_w
+    boxes[:, 1], boxes[:, 3] = (boxes[:, 1] - boxes[:, 3] / 2) * im_h, (boxes[:, 1] + boxes[:, 3] / 2) * im_h
+
+    crop_box = np.array([x, y, x + w, y + h])
+    centers = (boxes[:, :2] + boxes[:, 2:]) / 2.0
+    mask = np.logical_and(crop_box[:2] <= centers, centers <= crop_box[2:]).all(axis=1)
+
+    boxes[:, :2] = np.maximum(boxes[:, :2], crop_box[:2])
+    boxes[:, 2:] = np.minimum(boxes[:, 2:], crop_box[2:])
+    boxes[:, :2] -= crop_box[:2]
+    boxes[:, 2:] -= crop_box[:2]
+
+    mask = np.logical_and(mask, (boxes[:, :2] < boxes[:, 2:]).all(axis=1))
+    boxes = boxes * np.expand_dims(mask.astype('float32'), axis=1)
+    labels = labels * mask.astype('float32')
+    boxes[:, 0], boxes[:, 2] = (boxes[:, 0] + boxes[:, 2]) / 2 / w, (boxes[:, 2] - boxes[:, 0]) / w
+    boxes[:, 1], boxes[:, 3] = (boxes[:, 1] + boxes[:, 3]) / 2 / h, (boxes[:, 3] - boxes[:, 1]) / h
+
+    return boxes, labels, mask.sum()
+
 def get_yolo_detection(preds, anchors, class_num, img_width, img_height):
     """Get yolo box, confidence score, class label from Darknet53 output"""
     preds_n = np.array(preds)
@@ -315,6 +340,8 @@ def draw_boxes_on_image(image_path, boxes, scores, labels, label_names, score_th
     colors = {}
     for box, score, label in zip(boxes, scores, labels):
         if score < score_thresh:
+            continue
+        if box[2] <= box[0] or box[3] <= box[1]:
             continue
         label = int(label)
         if label not in colors:

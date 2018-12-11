@@ -75,10 +75,10 @@ def train():
     base_exe.run(fluid.default_startup_program())
     # fluid.io.save_persistables(exe, "./test")
 
-    for var in fluid.default_main_program().list_vars():
-        if var.name.find("conv2d.output.1.tmp_1@GRAD") >= 0 and var.name[:7] in ["conv81.", "conv93.", "conv105"]:
-            var.persistable = True
-            print(var)
+    # for var in fluid.default_main_program().list_vars():
+    #     if var.name.find("conv2d.output.1.tmp_1@GRAD") >= 0 and var.name[:7] in ["conv81.", "conv93.", "conv105"]:
+    #         var.persistable = True
+    #         print(var)
 
     if cfg.pretrain_base:
         def if_exist(var):
@@ -99,7 +99,7 @@ def train():
     #     py_reader = model.py_reader
     #     py_reader.decorate_paddle_reader(train_reader)
     input_size = model.get_input_size()
-    train_reader = reader.train(input_size, batch_size=int(hyperparams['batch']) / 2, shuffle=False)
+    train_reader = reader.train(input_size, batch_size=int(hyperparams['batch']), shuffle=False)
     # train_reader = reader.train(input_size, 8, shuffle=False)
     feeder = fluid.DataFeeder(place=place, feed_list=model.feeds())
 
@@ -175,11 +175,11 @@ def train():
             # save_model("model_iter{}".format(iter_id))
             # yolo_grad1 = np.array(fluid.global_scope().find_var("conv81.conv2d.output.1.tmp_1@GRAD").get_tensor())
             # yolo_grad2 = np.array(fluid.global_scope().find_var("conv93.conv2d.output.1.tmp_1@GRAD").get_tensor())
-            yolo_grad3 = np.array(fluid.global_scope().find_var("conv105.conv2d.output.1.tmp_1@GRAD").get_tensor())
+            # yolo_grad3 = np.array(fluid.global_scope().find_var("conv105.conv2d.output.1.tmp_1@GRAD").get_tensor())
             # yolo_grad1.tofile("./output/yolo_grad1_{:04d}".format(iter_id))
             # yolo_grad2.tofile("./output/yolo_grad2_{:04d}".format(iter_id))
             # yolo_grad3.tofile("./output/yolo_grad3_{:04d}".format(iter_id))
-            print("yolo_grad3 nan: {}, max: {}".format(np.isnan(yolo_grad3).sum(), np.max(yolo_grad3)))
+            # print("yolo_grad3 nan: {}, max: {}".format(np.isnan(yolo_grad3).sum(), np.max(yolo_grad3)))
             every_pass_loss.append(losses[0])
             smoothed_loss.add_value(losses[0])
             lr = np.array(fluid.global_scope().find_var('learning_rate')

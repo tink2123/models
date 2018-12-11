@@ -55,8 +55,8 @@ _C.TRAIN.snapshot_iter = 1000
 _C.TRAIN.gt_min_area = -1
 
 # max target box number in an image
-_C.TRAIN.max_box_num = 10
-_C.max_box_num=10
+_C.TRAIN.max_box_num = 50
+_C.max_box_num=50
 
 #
 # Inference options

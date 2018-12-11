@@ -24,6 +24,7 @@ import random
 import copy
 import cv2
 import box_utils
+import image_utils
 from pycocotools.coco import COCO
 from config.config import cfg
 
@@ -35,6 +36,10 @@ class DataSetReader(object):
         self.has_parsed_categpry = False
 
     def _parse_dataset_dir(self, mode):
+        # cfg.data_dir = "dataset/coco"
+        # cfg.train_file_list = 'annotations/instances_val2017.json'
+        # cfg.train_data_dir = 'val2017'
+        # cfg.dataset = "coco2017"
         if 'coco2014' in cfg.dataset:
             cfg.train_file_list = 'annotations/instances_train2014.json'
             cfg.train_data_dir = 'train2014'
@@ -104,14 +109,6 @@ class DataSetReader(object):
             if gt_index >= cfg.max_box_num:
                 break
 
-    def _filter_imgs_by_valid_box(self, imgs):
-        """Exclude images with no ground truth box"""
-
-        def _is_valid(img):
-            return img['gt_boxes'].shape[0] > 0
-
-        imgs = [img for img in imgs if _is_valid(img)]
-
     def _parse_images(self, is_train):
         image_ids = self.COCO.getImgIds()
         image_ids.sort()
@@ -121,9 +118,10 @@ class DataSetReader(object):
             img['image'] = os.path.join(self.img_dir, img['file_name'])
             assert os.path.exists(img['image']), \
                     "image {} not found.".format(img['image'])
-            img['gt_id'] = np.zeros((10), dtype=np.int32)
-            img['gt_boxes'] = np.zeros((10, 4), dtype=np.float32)
-            img['gt_labels'] = np.zeros((10), dtype=np.int32)
+            box_num = cfg.max_box_num
+            img['gt_id'] = np.zeros((cfg.max_box_num), dtype=np.int32)
+            img['gt_boxes'] = np.zeros((cfg.max_box_num, 4), dtype=np.float32)
+            img['gt_labels'] = np.zeros((cfg.max_box_num), dtype=np.int32)
             for k in ['date_captured', 'url', 'license', 'file_name']:
                 if img.has_key(k):
                     del img[k]
@@ -131,7 +129,6 @@ class DataSetReader(object):
             if is_train:
                 self._parse_gt_annotations(img)
 
-        # self._filter_imgs_by_valid_box(imgs)
         print("Loaded {0} images from {1}.".format(len(imgs), cfg.dataset))
 
         return imgs
@@ -149,30 +146,16 @@ class DataSetReader(object):
             self._parse_dataset_dir(mode)
             self._parse_dataset_catagory()
 
-        def img_reader(mode, img, size, mean, std):
+        def img_reader(img, size, mean, std):
             im_path = img['image']
             im = cv2.imread(im_path).astype('float32')
             im = cv2.cvtColor(im, cv2.COLOR_BGR2RGB)
             im_shape = (size, size)
 
-            if mode == 'train':
-                interp_method = [
-                    cv2.INTER_NEAREST,
-                    cv2.INTER_LINEAR,
-                    cv2.INTER_AREA,
-                    cv2.INTER_CUBIC,
-                    cv2.INTER_LANCZOS4,
-                    ]
-            else:
-              interp_method = [cv2.INTER_CUBIC]
-            interp = interp_method[random.randint(0, len(interp_method) - 1)]
-
             h, w, _ = im.shape
             im_scale_x = size / float(w)
             im_scale_y = size / float(h)
-            out_img = cv2.resize(im, None, None, fx=im_scale_x, fy=im_scale_y, interpolation=interp)
-            # with open("resize.txt", 'w') as f:
-            #     f.write(str(out_img.reshape((-1, 1))))
+            out_img = cv2.resize(im, None, None, fx=im_scale_x, fy=im_scale_y, interpolation=cv2.INTER_CUBIC)
             mean = np.array(mean).reshape((1, 1, -1))
             std = np.array(std).reshape((1, 1, -1))
             out_img = (out_img / 255.0 - mean) / std
@@ -180,10 +163,22 @@ class DataSetReader(object):
 
             return (out_img, int(img['id']), (h, w))
 
-        def gt_reader(img):
+        def img_reader_with_augment(img, size, mean, std):
+            im_path = img['image']
+            im = cv2.imread(im_path)
+            im = cv2.cvtColor(im, cv2.COLOR_BGR2RGB)
+            im_shape = (size, size)
             gt_boxes = img['gt_boxes']
             gt_labels = img['gt_labels']
-            return (gt_boxes, gt_labels)
+
+            im, gt_boxes, gt_labels = image_utils.image_augment(im, gt_boxes, gt_labels, size, mean)
+            
+            mean = np.array(mean).reshape((1, 1, -1))
+            std = np.array(std).reshape((1, 1, -1))
+            out_img = (im.astype('float32') / 255.0 - mean) / std
+            out_img = out_img.transpose((2, 0, 1))
+
+            return (out_img, gt_boxes, gt_labels)
 
         def reader():
             if mode == 'train':
@@ -192,29 +187,27 @@ class DataSetReader(object):
                     imgs = np.random.permutation(imgs)
                 read_cnt = 0
                 batch_out = []
-                # img_ids = []
+                img_ids = []
                 while True:
                     img = imgs[read_cnt % len(imgs)]
                     read_cnt += 1
                     if read_cnt % len(imgs) == 0 and shuffle:
                         imgs = np.random.permutation(imgs)
-                    im, im_id, im_shape = img_reader(mode, img, size, cfg.pixel_means, cfg.pixel_stds)
-                    gt_boxes, gt_labels = gt_reader(img)
-                    # random_jitter_gt(im, gtboxes)
+                    im, gt_boxes, gt_labels = img_reader_with_augment(img, size, cfg.pixel_means, cfg.pixel_stds)
                     batch_out.append((im, gt_boxes, gt_labels))
-                    # img_ids.append(img['id'])
+                    img_ids.append(img['id'])
 
                     if len(batch_out) == batch_size:
-                        # print("img_ids: ", img_ids)
+                        print("img_ids: ", img_ids)
                         yield batch_out
                         batch_out = []
-                        # img_ids = []
+                        img_ids = []
 
             elif mode == 'test':
                 imgs = self._parse_images_by_mode(mode)
                 batch_out = []
                 for img in imgs:
-                    im, im_id, im_shape = img_reader(mode, img, size, cfg.pixel_means, cfg.pixel_stds)
+                    im, im_id, im_shape = img_reader(img, size, cfg.pixel_means, cfg.pixel_stds)
                     batch_out.append((im, im_id, im_shape))
                     if len(batch_out) == batch_size:
                         yield batch_out
@@ -225,7 +218,7 @@ class DataSetReader(object):
                 img = {}
                 img['image'] = image
                 img['id'] = 0
-                im, im_id, im_shape = img_reader(mode, img, size, cfg.pixel_means, cfg.pixel_stds)
+                im, im_id, im_shape = img_reader(img, size, cfg.pixel_means, cfg.pixel_stds)
                 batch_out = [(im, im_id, im_shape)]
                 yield batch_out
 
