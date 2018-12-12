@@ -94,7 +94,6 @@ def parse_args():
     # ENV
     add_arg('parallel',         bool,   True,       "Whether use parallel.")
     add_arg('use_gpu',          bool,   True,      "Whether use GPU.")
-    # add_arg('data_cfg_path',    str,    'dataset/coco.data', "dataset split file config path")
     add_arg('name_path',        str,    'dataset/coco.names', "label name file path")
     add_arg('model_cfg_path',   str,    'config/yolov3.cfg', "YOLO model config file path.")
     add_arg('model_save_dir',   str,    'checkpoints',     "The path to save model.")
@@ -120,7 +119,7 @@ def parse_args():
     add_arg('debug',            bool,   False,   "Debug mode")
     # SINGLE EVAL AND DRAW
     add_arg('image_path',       str,   'image',  "The image path used to inference and visualize.")
-    add_arg('image_name',        str,    'dog.jpg',       "The single image used to inference and visualize.")
+    add_arg('image_name',        str,    None,       "The single image used to inference and visualize. None to inference all images in image_path")
     # yapf: enable
     args = parser.parse_args()
     file_name = sys.argv[0]

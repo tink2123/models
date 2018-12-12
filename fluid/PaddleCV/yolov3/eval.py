@@ -24,7 +24,6 @@ import box_utils
 import reader
 import models
 from utility import print_arguments, parse_args
-# from coco_reader import load_label_names
 import json
 from pycocotools.coco import COCO
 from pycocotools.cocoeval import COCOeval, Params

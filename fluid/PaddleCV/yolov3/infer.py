@@ -36,25 +36,32 @@ def infer():
             return os.path.exists(os.path.join(cfg.pretrained_model, var.name))
         fluid.io.load_vars(exe, cfg.pretrained_model, predicate=if_exist)
     # yapf: enable
-    infer_reader = reader.infer(input_size, os.path.join(cfg.image_path, cfg.image_name))
-    label_names, _ = reader.get_label_infos()
     feeder = fluid.DataFeeder(place=place, feed_list=model.feeds())
-
     fetch_list = outputs
-    data = next(infer_reader())
-    im_shape = data[0][2]
-    outputs = exe.run(
-        fetch_list=[v.name for v in fetch_list],
-        feed=feeder.feed(data),
-        return_numpy=True)
+    image_names = []
+    if cfg.image_name is not None:
+        image_names.append(cfg.image_name)
+    else:
+        for image_name in os.listdir(cfg.image_path):
+            if image_name.split('.')[-1] in ['jpg', 'png']:
+                image_names.append(image_name)
+    for image_name in image_names:
+        infer_reader = reader.infer(input_size, os.path.join(cfg.image_path, image_name))
+        label_names, _ = reader.get_label_infos()
+        data = next(infer_reader())
+        im_shape = data[0][2]
+        outputs = exe.run(
+            fetch_list=[v.name for v in fetch_list],
+            feed=feeder.feed(data),
+            return_numpy=True)
 
-    pred_boxes, pred_scores, pred_labels = box_utils.get_all_yolo_pred(outputs, yolo_anchors,
-                                                        yolo_classes, (input_size, input_size))
-    boxes, scores, labels = box_utils.calc_nms_box_new(pred_boxes, pred_scores, pred_labels, 
-                                                   cfg.valid_thresh, cfg.TEST.nms_thresh)
-    boxes = box_utils.rescale_box_in_input_image(boxes, im_shape, input_size)
-    path = os.path.join(cfg.image_path, cfg.image_name)
-    box_utils.draw_boxes_on_image(path, boxes, scores, labels, label_names, cfg.conf_thresh)
+        pred_boxes, pred_scores, pred_labels = box_utils.get_all_yolo_pred(outputs, yolo_anchors,
+                                                            yolo_classes, (input_size, input_size))
+        boxes, scores, labels = box_utils.calc_nms_box_new(pred_boxes, pred_scores, pred_labels, 
+                                                       cfg.valid_thresh, cfg.TEST.nms_thresh)
+        boxes = box_utils.rescale_box_in_input_image(boxes, im_shape, input_size)
+        path = os.path.join(cfg.image_path, image_name)
+        box_utils.draw_boxes_on_image(path, boxes, scores, labels, label_names, cfg.conf_thresh)
 
 
 if __name__ == '__main__':
