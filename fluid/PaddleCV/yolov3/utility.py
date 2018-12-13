@@ -94,7 +94,6 @@ def parse_args():
     # ENV
     add_arg('parallel',         bool,   True,       "Whether use parallel.")
     add_arg('use_gpu',          bool,   True,      "Whether use GPU.")
-    add_arg('name_path',        str,    'dataset/coco.names', "label name file path")
     add_arg('model_cfg_path',   str,    'config/yolov3.cfg', "YOLO model config file path.")
     add_arg('model_save_dir',   str,    'checkpoints',     "The path to save model.")
     add_arg('pretrain_base',    str,    'weights/pretrain', "The init model weights path.")
@@ -106,8 +105,8 @@ def parse_args():
     add_arg('use_profile',         bool,   False,       "Whether use profiler.")
     #SOLVER
     add_arg('learning_rate',    float,  0.001,     "Learning rate.")
-    add_arg('max_iter',         int,    1000000,   "Iter number.")
-    add_arg('snapshot_stride',  int,    1000,    "save model every snapshot stride.")
+    add_arg('max_iter',         int,    500000,   "Iter number.")
+    add_arg('snapshot_stride',  int,    2000,    "save model every snapshot stride.")
     add_arg('log_window',       int,    20,        "Log smooth window, set 1 for debug, set 20 for train.")
     # TRAIN TEST INFER
     add_arg('im_per_batch',       int,   1,        "Minibatch size.")

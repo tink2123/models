@@ -48,7 +48,7 @@ _C.TRAIN.bg_thresh_hi = 0.5
 _C.TRAIN.bg_thresh_lo = 0.0
 
 # Snapshot period
-_C.TRAIN.snapshot_iter = 1000
+_C.TRAIN.snapshot_iter = 2000
 # _C.TRAIN.snapshot_iter = 100
 
 # min valid area for gt boxes
@@ -114,7 +114,7 @@ _C.spatial_scale = 1. / 16.
 _C.learning_rate = 0.001
 
 # maximum number of iterations
-_C.max_iter = 1000000
+_C.max_iter = 500000
 # _C.max_iter = 500
 
 # warm up to learning rate 
@@ -123,7 +123,7 @@ _C.warm_up_iter = 4000
 _C.warm_up_factor = 0.
 
 # lr steps_with_decay
-_C.lr_steps = [800000, 900000]
+_C.lr_steps = [400000, 450000]
 # _C.lr_steps = [200, 300]
 _C.lr_gamma = 0.1
 

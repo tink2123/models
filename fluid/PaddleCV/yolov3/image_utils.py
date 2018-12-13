@@ -141,7 +141,7 @@ def random_expand(img, gtboxes, max_ratio=4., fill=None, keep_ratio=True, thresh
     out_img = np.zeros((oh, ow, c))
     if fill and len(fill) == c:
         for i in range(c):
-            out_img[:, :, i] = fill[i]
+            out_img[:, :, i] = fill[i] * 255.0
 
     out_img[off_y: off_y + h, off_x: off_x + w, :] = img
     gtboxes[:, 0] = ((gtboxes[:, 0] * w) + off_x) / float(ow)
@@ -158,5 +158,5 @@ def image_augment(img, gtboxes, gtlabels, size, means=None):
     img = random_interp(img, size)
     img, gtboxes = random_flip(img, gtboxes)
 
-    return img, gtboxes, gtlabels
+    return img.astype('float32'), gtboxes.astype('float32'), gtlabels.astype('int32')
 

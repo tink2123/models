@@ -30,6 +30,8 @@ import models
 from learning_rate import exponential_with_warmup_decay
 from config.config import cfg
 
+np.set_printoptions(threshold='nan')
+np.set_printoptions(suppress=True)
 
 def train():
 
@@ -99,7 +101,7 @@ def train():
     #     py_reader = model.py_reader
     #     py_reader.decorate_paddle_reader(train_reader)
     input_size = model.get_input_size()
-    train_reader = reader.train(input_size, batch_size=int(hyperparams['batch']), shuffle=False)
+    train_reader = reader.train(input_size, batch_size=int(hyperparams['batch']), shuffle=True)
     # train_reader = reader.train(input_size, 8, shuffle=False)
     feeder = fluid.DataFeeder(place=place, feed_list=model.feeds())
 

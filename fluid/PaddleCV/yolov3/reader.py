@@ -175,8 +175,8 @@ class DataSetReader(object):
             
             mean = np.array(mean).reshape((1, 1, -1))
             std = np.array(std).reshape((1, 1, -1))
-            out_img = (im.astype('float32') / 255.0 - mean) / std
-            out_img = out_img.transpose((2, 0, 1))
+            out_img = (im / 255.0 - mean) / std
+            out_img = out_img.transpose((2, 0, 1)).astype('float32')
 
             return (out_img, gt_boxes, gt_labels)
 
@@ -187,7 +187,7 @@ class DataSetReader(object):
                     imgs = np.random.permutation(imgs)
                 read_cnt = 0
                 batch_out = []
-                img_ids = []
+                # img_ids = []
                 while True:
                     img = imgs[read_cnt % len(imgs)]
                     read_cnt += 1
@@ -195,13 +195,13 @@ class DataSetReader(object):
                         imgs = np.random.permutation(imgs)
                     im, gt_boxes, gt_labels = img_reader_with_augment(img, size, cfg.pixel_means, cfg.pixel_stds)
                     batch_out.append((im, gt_boxes, gt_labels))
-                    img_ids.append(img['id'])
+                    # img_ids.append(img['id'])
 
                     if len(batch_out) == batch_size:
-                        print("img_ids: ", img_ids)
+                        # print("img_ids: ", img_ids)
                         yield batch_out
                         batch_out = []
-                        img_ids = []
+                        # img_ids = []
 
             elif mode == 'test':
                 imgs = self._parse_images_by_mode(mode)

@@ -216,7 +216,7 @@ class YOLOv3(object):
                 name='image', shape=self.image_shape, dtype='float32'
                 )
         self.gtbox = fluid.layers.data(
-                name='gtbox', shape=[cfg.max_box_num, 4], dtype='float32', lod_level=1
+                name='gtbox', shape=[cfg.max_box_num, 4], dtype='float32'
                 )
         self.gtlabel = fluid.layers.data(
                 name='gtlabel', shape=[cfg.max_box_num], dtype='int32'
