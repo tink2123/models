@@ -211,20 +211,29 @@ class YOLOv3(object):
         return self.yolo_classes
 
     def build_input(self):
-        self.image_shape = (3, int(self.hyperparams['height']), int(self.hyperparams['width']))
-        self.image = fluid.layers.data(
-                name='image', shape=self.image_shape, dtype='float32'
-                )
-        self.gtbox = fluid.layers.data(
-                name='gtbox', shape=[cfg.max_box_num, 4], dtype='float32'
-                )
-        self.gtlabel = fluid.layers.data(
-                name='gtlabel', shape=[cfg.max_box_num], dtype='int32'
-                )
-        self.im_shape = fluid.layers.data(
-                name="im_shape", shape=[2], dtype='int32')
-        self.im_id = fluid.layers.data(
-                name="im_id", shape=[1], dtype='int32')
+        self.image_shape = [3, int(self.hyperparams['height']), int(self.hyperparams['width'])]
+        if self.use_pyreader and self.is_train:
+            self.py_reader = fluid.layers.py_reader(
+                capacity=64,
+                shapes = [[-1] + self.image_shape, [-1, cfg.max_box_num, 4], [-1, cfg.max_box_num]],
+                lod_levels=[0, 0, 0],
+                dtypes=['float32'] * 2 + ['int32'],
+                use_double_buffer=True)
+            self.image, self.gtbox, self.gtlabel = fluid.layers.read_file(self.py_reader)
+        else:
+            self.image = fluid.layers.data(
+                    name='image', shape=self.image_shape, dtype='float32'
+                    )
+            self.gtbox = fluid.layers.data(
+                    name='gtbox', shape=[cfg.max_box_num, 4], dtype='float32'
+                    )
+            self.gtlabel = fluid.layers.data(
+                    name='gtlabel', shape=[cfg.max_box_num], dtype='int32'
+                    )
+            self.im_shape = fluid.layers.data(
+                    name="im_shape", shape=[2], dtype='int32')
+            self.im_id = fluid.layers.data(
+                    name="im_id", shape=[1], dtype='int32')
     
     def feeds(self):
         if not self.is_train:

@@ -43,15 +43,14 @@ def train():
 
     model = models.YOLOv3(cfg.model_cfg_path)
     model.build_model()
+    input_size = model.get_input_size()
     loss = model.loss()
     loss.persistable = True
-
-    # fluid.clip.set_gradient_clip(clip=fluid.clip.GradientClipByValue(max=10.0, min=-10.0))
 
     hyperparams = model.get_hyperparams()
     devices = os.getenv("CUDA_VISIBLE_DEVICES") or ""
     devices_num = len(devices.split(","))
-    total_batch_size = devices_num * int(hyperparams['batch'])
+    print("Found {} CUDA devices.".format(devices_num))
 
     learning_rate = float(hyperparams['learning_rate'])
     boundaries = cfg.lr_steps
@@ -65,7 +64,8 @@ def train():
             boundaries=boundaries,
             values=values,
             warmup_iter=cfg.warm_up_iter,
-            warmup_factor=cfg.warm_up_factor),
+            warmup_factor=cfg.warm_up_factor,
+            start_step=cfg.start_iter),
         regularization=fluid.regularizer.L2Decay(cfg.weight_decay),
         momentum=float(hyperparams['momentum']))
     optimizer.minimize(loss)
@@ -75,7 +75,6 @@ def train():
     place = fluid.CUDAPlace(0) if cfg.use_gpu else fluid.CPUPlace()
     base_exe = fluid.Executor(place)
     base_exe.run(fluid.default_startup_program())
-    # fluid.io.save_persistables(exe, "./test")
 
     # for var in fluid.default_main_program().list_vars():
     #     if var.name.find("conv2d.output.1.tmp_1@GRAD") >= 0 and var.name[:7] in ["conv81.", "conv93.", "conv105"]:
@@ -92,18 +91,13 @@ def train():
     else:
         exe = base_exe
 
-    # if cfg.use_pyreader:
-    #     train_reader = reader.train(
-    #         batch_size=cfg.TRAIN.im_per_batch,
-    #         total_batch_size=total_batch_size,
-    #         padding_total=cfg.TRAIN.padding_minibatch,
-    #         shuffle=True)
-    #     py_reader = model.py_reader
-    #     py_reader.decorate_paddle_reader(train_reader)
-    input_size = model.get_input_size()
-    train_reader = reader.train(input_size, batch_size=int(hyperparams['batch']), shuffle=True)
-    # train_reader = reader.train(input_size, 8, shuffle=False)
-    feeder = fluid.DataFeeder(place=place, feed_list=model.feeds())
+    if cfg.use_pyreader:
+        train_reader = reader.train(input_size, batch_size=int(hyperparams['batch'])/devices_num,shuffle=True)
+        py_reader = model.py_reader
+        py_reader.decorate_paddle_reader(train_reader)
+    else:
+        train_reader = reader.train(input_size, batch_size=int(hyperparams['batch']), shuffle=True)
+        feeder = fluid.DataFeeder(place=place, feed_list=model.feeds())
 
     def save_model(postfix):
         if not os.path.exists(cfg.model_save_dir):
@@ -122,7 +116,7 @@ def train():
             start_time = time.time()
             prev_start_time = start_time
             every_pass_loss = []
-            for iter_id in range(cfg.max_iter):
+            for iter_id in range(cfg.start_iter, cfg.max_iter):
                 prev_start_time = start_time
                 start_time = time.time()
                 losses = exe.run(fetch_list=[v.name for v in fetch_list])
@@ -147,6 +141,7 @@ def train():
         every_pass_loss = []
         smoothed_loss = SmoothedValue(cfg.log_window)
         for iter_id, data in enumerate(train_reader()):
+            iter_id += cfg.start_iter
             prev_start_time = start_time
             start_time = time.time()
             losses = exe.run(fetch_list=[v.name for v in fetch_list],

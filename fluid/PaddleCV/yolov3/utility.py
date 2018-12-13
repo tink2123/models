@@ -101,8 +101,9 @@ def parse_args():
     add_arg('dataset',          str,   'coco2017',  "coco2014, coco2017.")
     add_arg('class_num',        int,   80,          "Class number.")
     add_arg('data_dir',         str,   'dataset/coco',        "The data root path.")
-    add_arg('use_pyreader',     bool,   False,           "Use pyreader.")
-    add_arg('use_profile',         bool,   False,       "Whether use profiler.")
+    add_arg('use_pyreader',     bool,   True,           "Use pyreader.")
+    add_arg('use_profile',      bool,   False,       "Whether use profiler.")
+    add_arg('start_iter',       int,    0,     "Start iteration.")
     #SOLVER
     add_arg('learning_rate',    float,  0.001,     "Learning rate.")
     add_arg('max_iter',         int,    500000,   "Iter number.")
