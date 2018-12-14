@@ -59,7 +59,7 @@ def eval():
         fluid.io.load_vars(exe, cfg.pretrained_model, predicate=if_exist)
     # yapf: enable
     input_size = model.get_input_size()
-    test_reader = reader.test(input_size, max(devices_num, 1))
+    test_reader = reader.test(input_size, 1)
     label_names, label_ids = reader.get_label_infos()
     if cfg.debug:
         print("Load in labels {} with ids {}".format(label_names, label_ids))

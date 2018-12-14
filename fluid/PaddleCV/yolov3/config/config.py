@@ -48,7 +48,7 @@ _C.TRAIN.bg_thresh_hi = 0.5
 _C.TRAIN.bg_thresh_lo = 0.0
 
 # Snapshot period
-_C.TRAIN.snapshot_iter = 2000
+_C.TRAIN.snapshot_iter = 1000
 # _C.TRAIN.snapshot_iter = 100
 
 # min valid area for gt boxes

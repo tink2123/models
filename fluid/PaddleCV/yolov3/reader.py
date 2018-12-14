@@ -21,11 +21,13 @@ from __future__ import unicode_literals
 import numpy as np
 import os
 import random
+import time
 import copy
 import cv2
 import box_utils
 import image_utils
 from pycocotools.coco import COCO
+from data_utils import GeneratorEnqueuer
 from config.config import cfg
 
 
@@ -184,7 +186,7 @@ class DataSetReader(object):
             if mode == 'train':
                 imgs = self._parse_images_by_mode(mode)
                 if shuffle:
-                    imgs = np.random.permutation(imgs)
+                    np.random.shuffle(imgs)
                 read_cnt = 0
                 batch_out = []
                 # img_ids = []
@@ -192,7 +194,7 @@ class DataSetReader(object):
                     img = imgs[read_cnt % len(imgs)]
                     read_cnt += 1
                     if read_cnt % len(imgs) == 0 and shuffle:
-                        imgs = np.random.permutation(imgs)
+                        np.random.shuffle(imgs)
                     im, gt_boxes, gt_labels = img_reader_with_augment(img, size, cfg.pixel_means, cfg.pixel_stds)
                     batch_out.append((im, gt_boxes, gt_labels))
                     # img_ids.append(img['id'])
@@ -227,8 +229,42 @@ class DataSetReader(object):
 
 dsr = DataSetReader()
 
-def train(size=416, batch_size=64, shuffle=True):
-    return dsr.get_reader('train', size, batch_size, shuffle)
+def train(size=416, 
+          batch_size=64, 
+          shuffle=True, 
+          use_multiprocessing=True,
+          num_workers=8,
+          max_queue=24):
+    generator = dsr.get_reader('train', size, batch_size, shuffle)
+
+    if not use_multiprocessing:
+        return generator
+
+    def infinite_reader():
+        while True:
+            for data in generator():
+                yield data
+
+    def reader():
+        try:
+            enqueuer = GeneratorEnqueuer(
+                infinite_reader(), use_multiprocessing=use_multiprocessing)
+            enqueuer.start(max_queue_size=max_queue, workers=num_workers)
+            generator_out = None
+            while True:
+                while enqueuer.is_running():
+                    if not enqueuer.queue.empty():
+                        generator_out = enqueuer.queue.get()
+                        break
+                    else:
+                        time.sleep(0.02)
+                yield generator_out
+                generator_out = None
+        finally:
+            if enqueuer is not None:
+                enqueuer.stop()
+    
+    return reader
 
 def test(size=416, batch_size=1):
     return dsr.get_reader('test', size, batch_size)

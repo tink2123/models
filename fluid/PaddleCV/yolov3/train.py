@@ -41,7 +41,7 @@ def train():
         random.seed(0)
         np.random.seed(0)
 
-    model = models.YOLOv3(cfg.model_cfg_path)
+    model = models.YOLOv3(cfg.model_cfg_path, use_pyreader=cfg.use_pyreader)
     model.build_model()
     input_size = model.get_input_size()
     loss = model.loss()
@@ -76,11 +76,6 @@ def train():
     base_exe = fluid.Executor(place)
     base_exe.run(fluid.default_startup_program())
 
-    # for var in fluid.default_main_program().list_vars():
-    #     if var.name.find("conv2d.output.1.tmp_1@GRAD") >= 0 and var.name[:7] in ["conv81.", "conv93.", "conv105"]:
-    #         var.persistable = True
-    #         print(var)
-
     if cfg.pretrain_base:
         def if_exist(var):
             return os.path.exists(os.path.join(cfg.pretrain_base, var.name))
@@ -93,6 +88,7 @@ def train():
 
     if cfg.use_pyreader:
         train_reader = reader.train(input_size, batch_size=int(hyperparams['batch'])/devices_num,shuffle=True)
+        # train_reader = reader.train(input_size, batch_size=8 ,shuffle=True)
         py_reader = model.py_reader
         py_reader.decorate_paddle_reader(train_reader)
     else:
@@ -146,37 +142,6 @@ def train():
             start_time = time.time()
             losses = exe.run(fetch_list=[v.name for v in fetch_list],
                                    feed=feeder.feed(data))
-            # print("losses: ", losses)
-            # loss106 = np.array(fluid.global_scope().find_var("yolo_loss106").get_tensor())
-            # loss82_in = np.array(fluid.global_scope().find_var("conv81.conv2d.output.1.tmp_1").get_tensor())
-            # loss94_in = np.array(fluid.global_scope().find_var("conv93.conv2d.output.1.tmp_1").get_tensor())
-            # loss106_in = np.array(fluid.global_scope().find_var("conv105.conv2d.output.1.tmp_1").get_tensor())
-            # yolo_grad82 = np.array(fluid.global_scope().find_var("yolo_loss82@GRAD").get_tensor())
-            # yolo_grad94 = np.array(fluid.global_scope().find_var("yolo_loss94@GRAD").get_tensor())
-            # yolo_grad106 = np.array(fluid.global_scope().find_var("yolo_loss106@GRAD").get_tensor())
-            # upsample = np.array(fluid.global_scope().find_var("upsample85.tmp_0").get_tensor())
-            # concat = np.array(fluid.global_scope().find_var("concat_0.tmp_0").get_tensor())
-            # concat_in = np.array(fluid.global_scope().find_var("leaky_relu_56.tmp_0").get_tensor())
-            # img = np.array(fluid.global_scope().find_var("image").get_tensor())
-            # conv0 = np.array(fluid.global_scope().find_var("conv0.conv2d.output.1.tmp_0").get_tensor())
-            # bn0 = np.array(fluid.global_scope().find_var("bn0.output.tmp_2").get_tensor())
-            # leaky0 = np.array(fluid.global_scope().find_var("leaky_relu_0.tmp_0").get_tensor())
-            # res4 = np.array(fluid.global_scope().find_var("res4").get_tensor())
-            # print("img: ", img.shape, img.sum(), np.isnan(img).sum())
-            # print("conv0: ", conv0.shape, conv0.sum(), np.isnan(conv0).sum())
-            # print("bn0: ", bn0.shape, bn0.sum(), np.isnan(bn0).sum())
-            # print("leaky0: ", leaky0.shape, leaky0.sum(), np.isnan(leaky0).sum())
-            # loss82_in.tofile("./output/yolo_input1_{:04d}".format(iter_id))
-            # loss94_in.tofile("./output/yolo_input2_{:04d}".format(iter_id))
-            # loss106_in.tofile("./output/yolo_input3_{:04d}".format(iter_id))
-            # save_model("model_iter{}".format(iter_id))
-            # yolo_grad1 = np.array(fluid.global_scope().find_var("conv81.conv2d.output.1.tmp_1@GRAD").get_tensor())
-            # yolo_grad2 = np.array(fluid.global_scope().find_var("conv93.conv2d.output.1.tmp_1@GRAD").get_tensor())
-            # yolo_grad3 = np.array(fluid.global_scope().find_var("conv105.conv2d.output.1.tmp_1@GRAD").get_tensor())
-            # yolo_grad1.tofile("./output/yolo_grad1_{:04d}".format(iter_id))
-            # yolo_grad2.tofile("./output/yolo_grad2_{:04d}".format(iter_id))
-            # yolo_grad3.tofile("./output/yolo_grad3_{:04d}".format(iter_id))
-            # print("yolo_grad3 nan: {}, max: {}".format(np.isnan(yolo_grad3).sum(), np.max(yolo_grad3)))
             every_pass_loss.append(losses[0])
             smoothed_loss.add_value(losses[0])
             lr = np.array(fluid.global_scope().find_var('learning_rate')

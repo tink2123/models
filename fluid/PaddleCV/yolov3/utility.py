@@ -107,7 +107,7 @@ def parse_args():
     #SOLVER
     add_arg('learning_rate',    float,  0.001,     "Learning rate.")
     add_arg('max_iter',         int,    500000,   "Iter number.")
-    add_arg('snapshot_stride',  int,    2000,    "save model every snapshot stride.")
+    add_arg('snapshot_stride',  int,    1000,    "save model every snapshot stride.")
     add_arg('log_window',       int,    20,        "Log smooth window, set 1 for debug, set 20 for train.")
     # TRAIN TEST INFER
     add_arg('im_per_batch',       int,   1,        "Minibatch size.")
