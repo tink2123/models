@@ -95,7 +95,7 @@ class DataSetReader(object):
         anno = self.COCO.loadAnns(self.COCO.getAnnIds(imgIds=img['id'], iscrowd=None))
         gt_index = 0
         for target in anno:
-            if target['area'] < cfg.TRAIN.gt_min_area:
+            if target['area'] < cfg.gt_min_area:
                 continue
             if target.has_key('ignore') and target['ignore']:
                 continue

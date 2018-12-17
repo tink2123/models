@@ -107,10 +107,9 @@ def parse_args():
     #SOLVER
     add_arg('learning_rate',    float,  0.001,     "Learning rate.")
     add_arg('max_iter',         int,    500000,   "Iter number.")
-    add_arg('snapshot_stride',  int,    1000,    "save model every snapshot stride.")
+    add_arg('snapshot_stride',  int,    2000,    "save model every snapshot stride.")
     add_arg('log_window',       int,    20,        "Log smooth window, set 1 for debug, set 20 for train.")
     # TRAIN TEST INFER
-    add_arg('im_per_batch',       int,   1,        "Minibatch size.")
     add_arg('valid_thresh',    float, 0.01,    "Valid confidence score for NMS.")
     add_arg('nms_thresh',    float, 0.45,    "NMS threshold.")
     add_arg('nms_topk',    int, 400,    "The number of boxes to perform NMS.")
@@ -123,8 +122,5 @@ def parse_args():
     # yapf: enable
     args = parser.parse_args()
     file_name = sys.argv[0]
-    if 'train' in file_name or 'profile' in file_name:
-        merge_cfg_from_args(args, 'train')
-    else:
-        merge_cfg_from_args(args, 'test')
+    merge_cfg_from_args(args)
     return args

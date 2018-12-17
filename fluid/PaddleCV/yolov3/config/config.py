@@ -23,88 +23,46 @@ cfg = _C
 #
 # Training options
 #
-_C.TRAIN = AttrDict()
-
-# scales an image's shortest side
-_C.TRAIN.scales = [800]
-
-# max size of longest side
-_C.TRAIN.max_size = 1333
-
-# images per GPU in minibatch
-_C.TRAIN.im_per_batch = 1
-
-# roi minibatch size per image
-_C.TRAIN.batch_size_per_im = 512
-
-# target fraction of foreground roi minibatch 
-_C.TRAIN.fg_fractrion = 0.25
-
-# overlap threshold for a foreground roi
-_C.TRAIN.fg_thresh = 0.5
-
-# overlap threshold for a background roi
-_C.TRAIN.bg_thresh_hi = 0.5
-_C.TRAIN.bg_thresh_lo = 0.0
 
 # Snapshot period
-_C.TRAIN.snapshot_iter = 1000
-# _C.TRAIN.snapshot_iter = 100
+_C.snapshot_iter = 2000
 
 # min valid area for gt boxes
-_C.TRAIN.gt_min_area = -1
+_C.gt_min_area = -1
 
 # max target box number in an image
-_C.TRAIN.max_box_num = 50
-_C.max_box_num=50
+_C.max_box_num = 50
+
 
 #
-# Inference options
+# Training options
 #
-_C.TEST = AttrDict()
 
-# scales an image's shortest side
-_C.TEST.scales = [800]
+# valid score threshold to include boxes
+_C.valid_thresh = 0.01
 
-# max size of longest side
-_C.TEST.max_size = 1333
+# threshold vale for box non-max suppression
+_C.nms_thresh = 0.45
 
-# eta for adaptive NMS in RPN
-_C.TEST.rpn_eta = 1.0
+# the number of top k boxes to perform nms
+_C.nms_topk = 400
 
-# min score threshold to infer
-_C.TEST.score_thresh = 0.05
+# the number of output boxes after nms
+_C.nms_posk = 100
 
-# overlap threshold used for NMS
-_C.TEST.nms_thresh = 0.5
+# score threshold for draw box in debug mode
+_C.conf_thresh = 0.5
 
-# number of RPN proposals to keep before NMS
-_C.TEST.rpn_pre_nms_top_n = 6000
-
-# number of RPN proposals to keep after NMS
-_C.TEST.rpn_post_nms_top_n = 1000
-
-# min size in RPN proposals
-_C.TEST.rpn_min_size = 0.0
-
-# max number of detections
-_C.TEST.detectiions_per_im = 100
-
-# NMS threshold used on RPN proposals
-_C.TEST.rpn_nms_thresh = 0.7
 
 #
 # Model options
 #
 
-# sampling ratio for roi align
-_C.sampling_ratio = 0
+# pixel mean values
+_C.pixel_means = [0.485, 0.456, 0.406]
 
-# pooled width and pooled height 
-_C.roi_resolution = 14
-
-# spatial scale 
-_C.spatial_scale = 1. / 16.
+# pixel std values
+_C.pixel_stds = [0.229, 0.224, 0.225]
 
 #
 # SOLVER options
@@ -115,16 +73,13 @@ _C.learning_rate = 0.001
 
 # maximum number of iterations
 _C.max_iter = 500000
-# _C.max_iter = 500
 
 # warm up to learning rate 
 _C.warm_up_iter = 4000
-# _C.warm_up_iter = 100
 _C.warm_up_factor = 0.
 
 # lr steps_with_decay
 _C.lr_steps = [400000, 450000]
-# _C.lr_steps = [200, 300]
 _C.lr_gamma = 0.1
 
 # L2 regularization hyperparameter
@@ -149,12 +104,6 @@ _C.class_num = 80
 # support pyreader
 _C.use_pyreader = True
 
-# pixel mean values
-_C.pixel_means = [0.485, 0.456, 0.406]
-
-# pixel std values
-_C.pixel_stds = [0.229, 0.224, 0.225]
-
 # dataset path
 _C.train_file_list = 'annotations/instances_train2017.json'
 _C.train_data_dir = 'train2017'
@@ -162,19 +111,11 @@ _C.val_file_list = 'annotations/instances_val2017.json'
 _C.val_data_dir = 'val2017'
 
 
-def merge_cfg_from_args(args, mode):
+def merge_cfg_from_args(args):
     """Merge config keys, values in args into the global config."""
-    if mode == 'train':
-        sub_d = _C.TRAIN
-    else:
-        sub_d = _C.TEST
     for k, v in sorted(six.iteritems(vars(args))):
-        d = _C
         try:
             value = eval(v)
         except:
             value = v
-        if k in sub_d:
-            sub_d[k] = value
-        else:
-            d[k] = value
+        _C[k] = value

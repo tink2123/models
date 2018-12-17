@@ -88,7 +88,6 @@ def train():
 
     if cfg.use_pyreader:
         train_reader = reader.train(input_size, batch_size=int(hyperparams['batch'])/devices_num,shuffle=True)
-        # train_reader = reader.train(input_size, batch_size=8 ,shuffle=True)
         py_reader = model.py_reader
         py_reader.decorate_paddle_reader(train_reader)
     else:
@@ -124,7 +123,7 @@ def train():
                     iter_id, lr[0],
                     smoothed_loss.get_median_value(), start_time - prev_start_time))
                 sys.stdout.flush()
-                if (iter_id + 1) % cfg.TRAIN.snapshot_iter == 0:
+                if (iter_id + 1) % cfg.snapshot_iter == 0:
                     save_model("model_iter{}".format(iter_id))
         except fluid.core.EOFException:
             py_reader.reset()
@@ -150,7 +149,7 @@ def train():
                 iter_id, lr[0], smoothed_loss.get_median_value(), start_time - prev_start_time))
             sys.stdout.flush()
 
-            if (iter_id + 1) % cfg.TRAIN.snapshot_iter == 0:
+            if (iter_id + 1) % cfg.snapshot_iter == 0:
                 save_model("model_iter{}".format(iter_id))
             if (iter_id + 1) == cfg.max_iter:
                 print("Finish iter {}".format(iter_id))

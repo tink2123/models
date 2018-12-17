@@ -21,7 +21,6 @@ def infer():
     if not os.path.exists('output'):
         os.mkdir('output')
 
-    # label_names, _ = load_label_names(cfg.name_path)
     model = models.YOLOv3(cfg.model_cfg_path, is_train=False)
     model.build_model()
     outputs = model.get_pred()
@@ -58,7 +57,7 @@ def infer():
         pred_boxes, pred_scores, pred_labels = box_utils.get_all_yolo_pred(outputs, yolo_anchors,
                                                             yolo_classes, (input_size, input_size))
         boxes, scores, labels = box_utils.calc_nms_box_new(pred_boxes, pred_scores, pred_labels, 
-                                                       cfg.valid_thresh, cfg.TEST.nms_thresh)
+                                                       cfg.valid_thresh, cfg.nms_thresh)
         boxes = box_utils.rescale_box_in_input_image(boxes, im_shape, input_size)
         path = os.path.join(cfg.image_path, image_name)
         box_utils.draw_boxes_on_image(path, boxes, scores, labels, label_names, cfg.conf_thresh)

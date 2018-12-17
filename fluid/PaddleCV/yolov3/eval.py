@@ -97,7 +97,7 @@ def eval():
             pred_boxes, pred_scores, pred_labels = box_utils.get_all_yolo_pred(
                     batch_outputs, yolo_anchors, yolo_classes, (input_size, input_size))
             boxes, scores, labels = box_utils.calc_nms_box_new(pred_boxes, pred_scores, pred_labels,
-                                                    cfg.valid_thresh, cfg.TEST.nms_thresh)
+                                                    cfg.valid_thresh, cfg.nms_thresh)
             boxes = box_utils.rescale_box_in_input_image(boxes, im_shape, input_size)
             dts_res += get_pred_result(boxes, scores, labels, im_id)
             end_time = time.time()
