@@ -182,7 +182,7 @@ def get_yolo_detection(preds, anchors, class_num, img_width, img_height):
     grid_x = np.tile(np.arange(w).reshape((1, w)), (h, 1))
     grid_y = np.tile(np.arange(h).reshape((h, 1)), (1, w))
     anchors = [(anchors[i], anchors[i+1]) for i in range(0, len(anchors), 2)]
-    anchors_s = np.array([(an_w * w / img_width, an_h * h / img_height) for an_w, an_h in anchors])
+    anchors_s = np.array([(an_w, an_h) for an_w, an_h in anchors])
     anchor_w = anchors_s[:, 0:1].reshape((1, anchor_num, 1, 1))
     anchor_h = anchors_s[:, 1:2].reshape((1, anchor_num, 1, 1))
 
@@ -193,8 +193,8 @@ def get_yolo_detection(preds, anchors, class_num, img_width, img_height):
     
     pred_boxes[:, :, :, :, 0] = pred_boxes[:, :, :, :, 0] * img_width / w
     pred_boxes[:, :, :, :, 1] = pred_boxes[:, :, :, :, 1] * img_height / h
-    pred_boxes[:, :, :, :, 2] = pred_boxes[:, :, :, :, 2] * img_width / w
-    pred_boxes[:, :, :, :, 3] = pred_boxes[:, :, :, :, 3] * img_height / h
+    pred_boxes[:, :, :, :, 2] = pred_boxes[:, :, :, :, 2]
+    pred_boxes[:, :, :, :, 3] = pred_boxes[:, :, :, :, 3]
 
     pred_boxes = box_xywh_to_xyxy(pred_boxes)
     pred_boxes = np.tile(np.expand_dims(pred_boxes, axis=4), (1, 1, 1, 1, class_num, 1))

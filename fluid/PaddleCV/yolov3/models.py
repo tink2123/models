@@ -96,6 +96,7 @@ class YOLOv3(object):
         self.use_random = use_random
         self.outputs = []
         self.losses = []
+        self.downsample = 32
 
     def build_model(self):
         model_defs = self.config_parser.parse()
@@ -173,13 +174,13 @@ class YOLOv3(object):
                 self.outputs.append(out)
                 out.persistable = True
 
-                anchor_idxs = map(int, layer_def['mask'].split(','))
-                all_anchors = map(int, layer_def['anchors'].split(','))
-                anchors = []
-                for anchor_idx in anchor_idxs:
-                    anchors.append(all_anchors[anchor_idx * 2])
-                    anchors.append(all_anchors[anchor_idx * 2 + 1])
-                self.yolo_anchors.append(anchors)
+                anchor_mask = map(int, layer_def['mask'].split(','))
+                anchors = map(int, layer_def['anchors'].split(','))
+                mask_anchors = []
+                for m anchor_mask:
+                    mask_anchors.append(anchors[2 * m])
+                    mask_anchors.append(anchors[2 * m + 1])
+                self.yolo_anchors.append(mask_anchors)
                 class_num = int(layer_def['classes'])
                 self.yolo_classes.append(class_num)
 
@@ -190,11 +191,13 @@ class YOLOv3(object):
                             gtbox=self.gtbox,
                             gtlabel=self.gtlabel,
                             anchors=anchors,
+                            anchor_mask=anchor_mask,
                             class_num=class_num,
                             ignore_thresh=ignore_thresh,
-                            input_size=int(self.hyperparams['height']),
+                            downsample=self.downsample,
                             name="yolo_loss"+str(i))
                     self.losses.append(fluid.layers.reduce_mean(loss))
+                    self.downsample //= 2
 
             layer_outputs.append(out)
 
