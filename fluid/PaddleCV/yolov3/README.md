@@ -112,7 +112,7 @@ Inference is used to get prediction score or image features based on trained mod
         --pretrained_model=${path_to_pretrain_model}  \
         --image_path=data/COCO17/val2017/  \
         --image_name=000000000139.jpg \
-        --conf_threshold=0.5
+        --draw_threshold=0.5
 
 Visualization of infer result is shown as below:
 <p align="center">

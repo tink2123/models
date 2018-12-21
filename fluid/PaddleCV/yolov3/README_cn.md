@@ -109,7 +109,7 @@ YOLOv3
         --pretrained_model=${path_to_pretrain_model}  \
         --image_path=data/COCO17/val2017/  \
         --image_name=000000000139.jpg \
-        --conf_threshold=0.5
+        --draw_threshold=0.5
 
 下图为模型可视化预测结果：
 <p align="center">

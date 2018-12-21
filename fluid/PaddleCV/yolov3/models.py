@@ -106,8 +106,8 @@ class YOLOv3(object):
         self.hyperparams = model_defs.pop(0)
         assert self.hyperparams['type'].lower() == "net", \
                 "net config params should be given in the first segment named 'net'"
-        self.img_height = self.hyperparams['height']
-        self.img_width = self.hyperparams['width']
+        self.img_height = cfg.input_size
+        self.img_width = cfg.input_size
 
         self.build_input()
 
@@ -177,7 +177,7 @@ class YOLOv3(object):
                 anchor_mask = map(int, layer_def['mask'].split(','))
                 anchors = map(int, layer_def['anchors'].split(','))
                 mask_anchors = []
-                for m anchor_mask:
+                for m in anchor_mask:
                     mask_anchors.append(anchors[2 * m])
                     mask_anchors.append(anchors[2 * m + 1])
                 self.yolo_anchors.append(mask_anchors)
@@ -214,7 +214,7 @@ class YOLOv3(object):
         return self.yolo_classes
 
     def build_input(self):
-        self.image_shape = [3, int(self.hyperparams['height']), int(self.hyperparams['width'])]
+        self.image_shape = (3, self.img_height, self.img_width)
         if self.use_pyreader and self.is_train:
             self.py_reader = fluid.layers.py_reader(
                 capacity=64,
@@ -247,6 +247,6 @@ class YOLOv3(object):
         return self.hyperparams
 
     def get_input_size(self):
-        return int(self.hyperparams['height'])
+        return cfg.input_size if cfg.input_size
 
         

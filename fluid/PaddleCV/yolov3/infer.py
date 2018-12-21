@@ -60,7 +60,7 @@ def infer():
                                                        cfg.valid_thresh, cfg.nms_thresh)
         boxes = box_utils.rescale_box_in_input_image(boxes, im_shape, input_size)
         path = os.path.join(cfg.image_path, image_name)
-        box_utils.draw_boxes_on_image(path, boxes, scores, labels, label_names, cfg.conf_thresh)
+        box_utils.draw_boxes_on_image(path, boxes, scores, labels, label_names, cfg.draw_thresh)
 
 
 if __name__ == '__main__':

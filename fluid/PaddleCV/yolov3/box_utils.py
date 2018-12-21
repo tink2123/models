@@ -262,7 +262,7 @@ def calc_nms_box_new(pred_boxes, pred_scores, pred_labels, valid_thresh=0.01, nm
 
 def calc_nms_box(pred_boxes, pred_confs, pred_labels, im_shape, input_size, valid_thresh=0.8, nms_thresh=0.4, nms_topk=400, nms_posk=100):
     """
-    Removes detections which confidence score under conf_thresh and perform 
+    Removes detections which confidence score under valid_thresh and perform 
     Non-Maximun Suppression to filtered boxes
     """
     _, box_num, class_num = pred_labels.shape
@@ -321,7 +321,6 @@ def calc_nms_box(pred_boxes, pred_confs, pred_labels, im_shape, input_size, vali
     return (output_boxes, output_scores, output_labels)
 
 def draw_boxes_on_image(image_path, boxes, scores, labels, label_names, score_thresh=0.5):
-
     image = np.array(Image.open(image_path))
     plt.figure()
     _, ax = plt.subplots(1)
