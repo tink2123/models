@@ -38,23 +38,23 @@ class DataSetReader(object):
         self.has_parsed_categpry = False
 
     def _parse_dataset_dir(self, mode):
-        # cfg.data_dir = "dataset/coco"
-        # cfg.train_file_list = 'annotations/instances_val2017.json'
-        # cfg.train_data_dir = 'val2017'
-        # cfg.dataset = "coco2017"
-        if 'coco2014' in cfg.dataset:
-            cfg.train_file_list = 'annotations/instances_train2014.json'
-            cfg.train_data_dir = 'train2014'
-            cfg.val_file_list = 'annotations/instances_val2014.json'
-            cfg.val_data_dir = 'val2014'
-        elif 'coco2017' in cfg.dataset:
-            cfg.train_file_list = 'annotations/instances_train2017.json'
-            cfg.train_data_dir = 'train2017'
-            cfg.val_file_list = 'annotations/instances_val2017.json'
-            cfg.val_data_dir = 'val2017'
-        else:
-            raise NotImplementedError('Dataset {} not supported'.format(
-                cfg.dataset))
+        cfg.data_dir = "dataset/coco"
+        cfg.train_file_list = 'annotations/instances_val2017.json'
+        cfg.train_data_dir = 'val2017'
+        cfg.dataset = "coco2017"
+        # if 'coco2014' in cfg.dataset:
+        #     cfg.train_file_list = 'annotations/instances_train2014.json'
+        #     cfg.train_data_dir = 'train2014'
+        #     cfg.val_file_list = 'annotations/instances_val2014.json'
+        #     cfg.val_data_dir = 'val2014'
+        # elif 'coco2017' in cfg.dataset:
+        #     cfg.train_file_list = 'annotations/instances_train2017.json'
+        #     cfg.train_data_dir = 'train2017'
+        #     cfg.val_file_list = 'annotations/instances_val2017.json'
+        #     cfg.val_data_dir = 'val2017'
+        # else:
+        #     raise NotImplementedError('Dataset {} not supported'.format(
+        #         cfg.dataset))
 
         if mode == 'train':
             cfg.train_file_list = os.path.join(cfg.data_dir, cfg.train_file_list)
@@ -141,7 +141,7 @@ class DataSetReader(object):
         else:
             return self._parse_images(is_train=(mode=='train'))
 
-    def get_reader(self, mode, size=416, batch_size=None, shuffle=False, image=None):
+    def get_reader(self, mode, size=416, batch_size=None, shuffle=False, random_sizes=[], image=None):
         assert mode in ['train', 'test', 'infer'], "Unknow mode type!"
         if mode != 'infer':
             assert batch_size is not None, "batch size connot be None in mode {}".format(mode)
@@ -182,6 +182,11 @@ class DataSetReader(object):
 
             return (out_img, gt_boxes, gt_labels)
 
+        def get_img_size(size, random_sizes=[]):
+            if len(random_sizes):
+                return np.random.choice(random_sizes)
+            return size
+
         def reader():
             if mode == 'train':
                 imgs = self._parse_images_by_mode(mode)
@@ -189,13 +194,14 @@ class DataSetReader(object):
                     np.random.shuffle(imgs)
                 read_cnt = 0
                 batch_out = []
+                img_size = get_img_size(size, random_sizes)
                 # img_ids = []
                 while True:
                     img = imgs[read_cnt % len(imgs)]
                     read_cnt += 1
                     if read_cnt % len(imgs) == 0 and shuffle:
                         np.random.shuffle(imgs)
-                    im, gt_boxes, gt_labels = img_reader_with_augment(img, size, cfg.pixel_means, cfg.pixel_stds)
+                    im, gt_boxes, gt_labels = img_reader_with_augment(img, img_size, cfg.pixel_means, cfg.pixel_stds)
                     batch_out.append((im, gt_boxes, gt_labels))
                     # img_ids.append(img['id'])
 
@@ -203,6 +209,7 @@ class DataSetReader(object):
                         # print("img_ids: ", img_ids)
                         yield batch_out
                         batch_out = []
+                        img_size = get_img_size(size, random_sizes)
                         # img_ids = []
 
             elif mode == 'test':
@@ -232,10 +239,11 @@ dsr = DataSetReader()
 def train(size=416, 
           batch_size=64, 
           shuffle=True, 
+          random_sizes=[],
           use_multiprocessing=True,
           num_workers=8,
           max_queue=24):
-    generator = dsr.get_reader('train', size, batch_size, shuffle)
+    generator = dsr.get_reader('train', size, batch_size, shuffle, random_sizes)
 
     if not use_multiprocessing:
         return generator

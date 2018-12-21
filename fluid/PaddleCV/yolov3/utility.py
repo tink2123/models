@@ -104,11 +104,12 @@ def parse_args():
     add_arg('use_pyreader',     bool,   True,           "Use pyreader.")
     add_arg('use_profile',      bool,   False,       "Whether use profiler.")
     add_arg('start_iter',       int,    0,     "Start iteration.")
+    add_arg('random_shape',     bool,   False,     "Resize to random shape for train reader")
     #SOLVER
     add_arg('learning_rate',    float,  0.001,     "Learning rate.")
     add_arg('max_iter',         int,    500000,   "Iter number.")
     add_arg('snapshot_stride',  int,    2000,    "save model every snapshot stride.")
-    add_arg('log_window',       int,    20,        "Log smooth window, set 1 for debug, set 20 for train.")
+    add_arg('log_window',       int,    50,        "Log smooth window, set 1 for debug, set 50 for train.")
     # TRAIN TEST INFER
     add_arg('valid_thresh',    float, 0.01,    "Valid confidence score for NMS.")
     add_arg('nms_thresh',    float, 0.45,    "NMS threshold.")

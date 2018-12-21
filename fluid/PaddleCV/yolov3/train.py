@@ -86,12 +86,16 @@ def train():
     else:
         exe = base_exe
 
+    random_sizes = []
+    if cfg.random_shape:
+        random_sizes = [32 * i for i in range(10, 20)]
+
     if cfg.use_pyreader:
-        train_reader = reader.train(input_size, batch_size=int(hyperparams['batch'])/devices_num,shuffle=True)
+        train_reader = reader.train(input_size, batch_size=int(hyperparams['batch'])/devices_num, shuffle=True, random_sizes=random_sizes)
         py_reader = model.py_reader
         py_reader.decorate_paddle_reader(train_reader)
     else:
-        train_reader = reader.train(input_size, batch_size=int(hyperparams['batch']), shuffle=True)
+        train_reader = reader.train(input_size, batch_size=int(hyperparams['batch']), shuffle=True, random_sizes=random_sizes)
         feeder = fluid.DataFeeder(place=place, feed_list=model.feeds())
 
     def save_model(postfix):
