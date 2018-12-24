@@ -170,8 +170,8 @@ class DataSetReader(object):
             im = cv2.imread(im_path)
             im = cv2.cvtColor(im, cv2.COLOR_BGR2RGB)
             im_shape = (size, size)
-            gt_boxes = img['gt_boxes']
-            gt_labels = img['gt_labels']
+            gt_boxes = img['gt_boxes'].copy()
+            gt_labels = img['gt_labels'].copy()
 
             im, gt_boxes, gt_labels = image_utils.image_augment(im, gt_boxes, gt_labels, size, mean)
             

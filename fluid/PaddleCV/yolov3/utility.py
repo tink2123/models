@@ -96,7 +96,7 @@ def parse_args():
     add_arg('use_gpu',          bool,   True,      "Whether use GPU.")
     add_arg('model_cfg_path',   str,    'config/yolov3.cfg', "YOLO model config file path.")
     add_arg('model_save_dir',   str,    'checkpoints',     "The path to save model.")
-    add_arg('pretrain_base',    str,    'weights/pretrain', "The init model weights path.")
+    add_arg('pretrain_base',    str,    'weights/darknet53', "The init model weights path.")
     add_arg('pretrained_model', str,    'weights/mxnet', "The pretrained model path.")
     add_arg('dataset',          str,   'coco2017',  "coco2014, coco2017.")
     add_arg('class_num',        int,   80,          "Class number.")
