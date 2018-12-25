@@ -38,23 +38,23 @@ class DataSetReader(object):
         self.has_parsed_categpry = False
 
     def _parse_dataset_dir(self, mode):
-        cfg.data_dir = "dataset/coco"
-        cfg.train_file_list = 'annotations/instances_val2017.json'
-        cfg.train_data_dir = 'val2017'
-        cfg.dataset = "coco2017"
-        # if 'coco2014' in cfg.dataset:
-        #     cfg.train_file_list = 'annotations/instances_train2014.json'
-        #     cfg.train_data_dir = 'train2014'
-        #     cfg.val_file_list = 'annotations/instances_val2014.json'
-        #     cfg.val_data_dir = 'val2014'
-        # elif 'coco2017' in cfg.dataset:
-        #     cfg.train_file_list = 'annotations/instances_train2017.json'
-        #     cfg.train_data_dir = 'train2017'
-        #     cfg.val_file_list = 'annotations/instances_val2017.json'
-        #     cfg.val_data_dir = 'val2017'
-        # else:
-        #     raise NotImplementedError('Dataset {} not supported'.format(
-        #         cfg.dataset))
+        # cfg.data_dir = "dataset/coco"
+        # cfg.train_file_list = 'annotations/instances_val2017.json'
+        # cfg.train_data_dir = 'val2017'
+        # cfg.dataset = "coco2017"
+        if 'coco2014' in cfg.dataset:
+            cfg.train_file_list = 'annotations/instances_train2014.json'
+            cfg.train_data_dir = 'train2014'
+            cfg.val_file_list = 'annotations/instances_val2014.json'
+            cfg.val_data_dir = 'val2014'
+        elif 'coco2017' in cfg.dataset:
+            cfg.train_file_list = 'annotations/instances_train2017.json'
+            cfg.train_data_dir = 'train2017'
+            cfg.val_file_list = 'annotations/instances_val2017.json'
+            cfg.val_data_dir = 'val2017'
+        else:
+            raise NotImplementedError('Dataset {} not supported'.format(
+                cfg.dataset))
 
         if mode == 'train':
             cfg.train_file_list = os.path.join(cfg.data_dir, cfg.train_file_list)

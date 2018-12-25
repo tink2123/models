@@ -214,7 +214,7 @@ class YOLOv3(object):
         return self.yolo_classes
 
     def build_input(self):
-        self.image_shape = (3, self.img_height, self.img_width)
+        self.image_shape = [3, self.img_height, self.img_width]
         if self.use_pyreader and self.is_train:
             self.py_reader = fluid.layers.py_reader(
                 capacity=64,
@@ -247,6 +247,6 @@ class YOLOv3(object):
         return self.hyperparams
 
     def get_input_size(self):
-        return cfg.input_size if cfg.input_size
+        return cfg.input_size
 
         

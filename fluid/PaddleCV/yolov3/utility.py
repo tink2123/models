@@ -98,16 +98,16 @@ def parse_args():
     add_arg('model_save_dir',   str,    'checkpoints',     "The path to save model.")
     add_arg('pretrain_base',    str,    'weights/darknet53', "The init model weights path.")
     add_arg('pretrained_model', str,    'weights/mxnet', "The pretrained model path.")
-    add_arg('dataset',          str,   'coco2017',  "coco2014, coco2017.")
-    add_arg('class_num',        int,   80,          "Class number.")
-    add_arg('data_dir',         str,   'dataset/coco',        "The data root path.")
+    add_arg('dataset',          str,    'coco2017',  "Dataset: coco2014, coco2017.")
+    add_arg('class_num',        int,    80,          "Class number.")
+    add_arg('data_dir',         str,    'dataset/coco',        "The data root path.")
     add_arg('use_pyreader',     bool,   True,           "Use pyreader.")
     add_arg('use_profile',      bool,   False,       "Whether use profiler.")
     add_arg('start_iter',       int,    0,     "Start iteration.")
     #SOLVER
     add_arg('learning_rate',    float,  0.001,     "Learning rate.")
     add_arg('max_iter',         int,    500000,   "Iter number.")
-    add_arg('snapshot_stride',  int,    2000,    "save model every snapshot stride.")
+    add_arg('snapshot_stride',  int,    2000,    "Save model every snapshot stride.")
     add_arg('log_window',       int,    20,        "Log smooth window, set 1 for debug, set 20 for train.")
     # TRAIN TEST INFER
     add_arg('input_size',       int,    608,    "Image input size of YOLOv3.")
@@ -120,7 +120,7 @@ def parse_args():
     # SINGLE EVAL AND DRAW
     add_arg('image_path',       str,   'image',  "The image path used to inference and visualize.")
     add_arg('image_name',       str,    None,       "The single image used to inference and visualize. None to inference all images in image_path")
-    add_arg('draw_thresh',      float,  0.5,    "confidence, score threshold for NMS.")
+    add_arg('draw_thresh',      float,  0.5,    "Confidence score threshold to draw prediction box in image in debug mode")
     # yapf: enable
     args = parser.parse_args()
     file_name = sys.argv[0]

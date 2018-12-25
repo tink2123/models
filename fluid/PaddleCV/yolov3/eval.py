@@ -40,10 +40,6 @@ def eval():
         if not os.path.exists('output'):
             os.mkdir('output')
 
-    devices = os.getenv("CUDA_VISIBLE_DEVICES") or ""
-    devices_num = len(devices.split(","))
-    print("Found {} CUDA device.".format(devices_num))
-
     model = models.YOLOv3(cfg.model_cfg_path, is_train=False)
     model.build_model()
     outputs = model.get_pred()
@@ -59,7 +55,7 @@ def eval():
         fluid.io.load_vars(exe, cfg.pretrained_model, predicate=if_exist)
     # yapf: enable
     input_size = model.get_input_size()
-    test_reader = reader.test(input_size, max(devices_num, 1))
+    test_reader = reader.test(input_size, 1)
     label_names, label_ids = reader.get_label_infos()
     if cfg.debug:
         print("Load in labels {} with ids {}".format(label_names, label_ids))

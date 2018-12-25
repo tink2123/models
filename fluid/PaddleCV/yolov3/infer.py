@@ -13,8 +13,6 @@ from pycocotools.coco import COCO
 from pycocotools.cocoeval import COCOeval, Params
 from config.config import cfg
 
-np.set_printoptions(threshold='nan')
-np.set_printoptions(suppress=True)
 
 def infer():
 

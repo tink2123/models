@@ -72,7 +72,7 @@ _C.pixel_stds = [0.229, 0.224, 0.225]
 _C.learning_rate = 0.001
 
 # maximum number of iterations
-_C.max_iter = 500000
+_C.max_iter = 500200
 
 # warm up to learning rate 
 _C.warm_up_iter = 4000

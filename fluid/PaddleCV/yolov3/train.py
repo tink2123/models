@@ -30,8 +30,6 @@ import models
 from learning_rate import exponential_with_warmup_decay
 from config.config import cfg
 
-np.set_printoptions(threshold='nan')
-np.set_printoptions(suppress=True)
 
 def train():
 
@@ -40,6 +38,9 @@ def train():
         fluid.default_main_program().random_seed = 1000
         random.seed(0)
         np.random.seed(0)
+        
+    if not os.path.exists(cfg.model_save_dir):
+        os.makedirs(cfg.model_save_dir)
 
     model = models.YOLOv3(cfg.model_cfg_path, use_pyreader=cfg.use_pyreader)
     model.build_model()
@@ -99,8 +100,6 @@ def train():
         feeder = fluid.DataFeeder(place=place, feed_list=model.feeds())
 
     def save_model(postfix):
-        if not os.path.exists(cfg.model_save_dir):
-            os.makedirs(cfg.model_save_dir)
         model_path = os.path.join(cfg.model_save_dir, postfix)
         if os.path.isdir(model_path):
             shutil.rmtree(model_path)
@@ -114,13 +113,15 @@ def train():
         try:
             start_time = time.time()
             prev_start_time = start_time
-            every_pass_loss = []
+            snapshot_loss = 0
+            snapshot_time = 0
             for iter_id in range(cfg.start_iter, cfg.max_iter):
                 prev_start_time = start_time
                 start_time = time.time()
                 losses = exe.run(fetch_list=[v.name for v in fetch_list])
-                every_pass_loss.append(np.mean(np.array(losses[0])))
                 smoothed_loss.add_value(np.mean(np.array(losses[0])))
+                snapshot_loss += np.mean(np.array(losses[0]))
+                snapshot_time += start_time - prev_start_time
                 lr = np.array(fluid.global_scope().find_var('learning_rate')
                               .get_tensor())
                 print("Iter {:d}, lr {:.6f}, loss {:.6f}, time {:.5f}".format(
@@ -129,24 +130,30 @@ def train():
                 sys.stdout.flush()
                 if (iter_id + 1) % cfg.snapshot_iter == 0:
                     save_model("model_iter{}".format(iter_id))
+                    print("Snapshot {} saved, average loss: {}, average time: {}".format(
+                        iter_id + 1, snapshot_loss / float(cfg.snapshot_iter), 
+                        snapshot_time / float(cfg.snapshot_iter)))
+                    snapshot_loss = 0
+                    snapshot_time = 0
         except fluid.core.EOFException:
             py_reader.reset()
-        return np.mean(every_pass_loss)
 
     def train_loop():
         start_time = time.time()
         prev_start_time = start_time
         start = start_time
-        every_pass_loss = []
         smoothed_loss = SmoothedValue(cfg.log_window)
+        snapshot_loss = 0
+        snapshot_time = 0
         for iter_id, data in enumerate(train_reader()):
             iter_id += cfg.start_iter
             prev_start_time = start_time
             start_time = time.time()
             losses = exe.run(fetch_list=[v.name for v in fetch_list],
                                    feed=feeder.feed(data))
-            every_pass_loss.append(losses[0])
             smoothed_loss.add_value(losses[0])
+            snapshot_loss += losses[0]
+            snapshot_time += start_time - prev_start_time
             lr = np.array(fluid.global_scope().find_var('learning_rate')
                           .get_tensor())
             print("Iter {:d}, lr: {:.6f}, loss: {:.4f}, time {:.5f}".format(
@@ -155,10 +162,14 @@ def train():
 
             if (iter_id + 1) % cfg.snapshot_iter == 0:
                 save_model("model_iter{}".format(iter_id))
+                print("Snapshot {} saved, average loss: {}, average time: {}".format(
+                    iter_id + 1, snapshot_loss / float(cfg.snapshot_iter), 
+                    snapshot_time / float(cfg.snapshot_iter)))
+                snapshot_loss = 0
+                snapshot_time = 0
             if (iter_id + 1) == cfg.max_iter:
                 print("Finish iter {}".format(iter_id))
                 break
-        return np.mean(every_pass_loss)
 
     if cfg.use_pyreader:
         train_loop_pyreader()
