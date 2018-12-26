@@ -150,10 +150,22 @@ class YOLOv3(object):
                         axis=1)
 
             elif layer_def['type'] == 'upsample':
-                scale = float(layer_def['stride'])
+                scale = int(layer_def['stride'])
+
+                # get dynamic upsample output shape
+                shape_nchw = fluid.layers.shape(out)
+                shape_hw = fluid.layers.slice(shape_nchw, axes=[0], \
+                                        starts=[2], ends=[4])
+                shape_hw.stop_gradient = True
+                in_shape = fluid.layers.cast(shape_hw, dtype='int32')
+                out_shape = in_shape * scale
+                out_shape.stop_gradient = True
+                
+                # reisze by actual_shape
                 out = fluid.layers.resize_nearest(
                         input=out,
                         scale=scale,
+                        actual_shape=out_shape,
                         name="upsample"+str(i))
 
             elif layer_def['type'] == 'maxpool':
@@ -172,7 +184,6 @@ class YOLOv3(object):
             elif layer_def['type'] == 'yolo':
                 self.yolo_layer_defs.append(layer_def)
                 self.outputs.append(out)
-                out.persistable = True
 
                 anchor_mask = map(int, layer_def['mask'].split(','))
                 anchors = map(int, layer_def['anchors'].split(','))
