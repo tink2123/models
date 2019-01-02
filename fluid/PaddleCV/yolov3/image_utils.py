@@ -151,6 +151,41 @@ def random_expand(img, gtboxes, max_ratio=4., fill=None, keep_ratio=True, thresh
 
     return out_img.astype('uint8'), gtboxes
 
+def image_mixup(img1, gtboxes1, gtlabels1, img2, gtboxes2, gtlabels2):
+    factor = np.random.beta(1.5, 1.5)
+    if factor >= 1.0:
+        return img1, gtboxes1, gtlabels1
+
+    h = max(img1.shape[0], img2.shape[0])
+    w = max(img1.shape[1], img2.shape[1])
+    img = np.zeros((h, w, img1.shape[2]), 'float32')
+    img[:img1.shape[0], :img1.shape[1], :] = img1.astype('float32') * factor
+    img[:img2.shape[0], :img2.shape[1], :] += img2.astype('float32') * (1.0 - factor)
+    gtboxes = np.zeros_like(gtboxes1)
+    gtlabels = np.zeros_like(gtlabels1)
+
+    gt_valid_mask1 = np.logical_and(gtboxes1[:, 2] > 0, gtboxes1[:, 3] > 0)
+    gtboxes1 = gtboxes1[gt_valid_mask1]
+    gtlabels1 = gtlabels1[gt_valid_mask1]
+    gtboxes1[:, 0] = gtboxes1[:, 0] * img1.shape[1] / w
+    gtboxes1[:, 1] = gtboxes1[:, 1] * img1.shape[0] / h
+    gtboxes1[:, 2] = gtboxes1[:, 2] * img1.shape[1] / w
+    gtboxes1[:, 3] = gtboxes1[:, 3] * img1.shape[0] / h
+
+    gt_valid_mask2 = np.logical_and(gtboxes2[:, 2] > 0, gtboxes2[:, 3] > 0)
+    gtboxes2 = gtboxes2[gt_valid_mask2]
+    gtlabels2 = gtlabels2[gt_valid_mask2]
+    gtboxes2[:, 0] = gtboxes2[:, 0] * img2.shape[1] / w
+    gtboxes2[:, 1] = gtboxes2[:, 1] * img2.shape[0] / h
+    gtboxes2[:, 2] = gtboxes2[:, 2] * img2.shape[1] / w
+    gtboxes2[:, 3] = gtboxes2[:, 3] * img2.shape[0] / h
+    gtboxes_all = np.concatenate((gtboxes1, gtboxes2), axis=0)
+    gtlabels_all = np.concatenate((gtlabels1, gtlabels2), axis=0)
+    gt_num = min(len(gtboxes), len(gtboxes_all))
+    gtboxes[:gt_num] = gtboxes_all[:gt_num]
+    gtlabels[:gt_num] = gtlabels_all[:gt_num]
+    return img.astype('uint8'), gtboxes, gtlabels
+
 def image_augment(img, gtboxes, gtlabels, size, means=None):
     img = random_distort(img)
     img, gtboxes = random_expand(img, gtboxes, fill=means)
