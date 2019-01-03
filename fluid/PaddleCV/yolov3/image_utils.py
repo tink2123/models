@@ -153,8 +153,11 @@ def random_expand(img, gtboxes, max_ratio=4., fill=None, keep_ratio=True, thresh
 
 def image_mixup(img1, gtboxes1, gtlabels1, img2, gtboxes2, gtlabels2):
     factor = np.random.beta(1.5, 1.5)
+    factor = max(0.0, min(1.0, factor))
     if factor >= 1.0:
         return img1, gtboxes1, gtlabels1
+    if factor <= 0.0:
+        return img2, gtboxes2, gtlabels2
 
     h = max(img1.shape[0], img2.shape[0])
     w = max(img1.shape[1], img2.shape[1])
