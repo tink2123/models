@@ -180,10 +180,10 @@ class DataSetReader(object):
                         mixup_im, mixup_gt_boxes, mixup_gt_labels)
 
             im, gt_boxes, gt_labels = image_utils.image_augment(im, gt_boxes, gt_labels, size, mean)
-            h, w, _ = im.shape
-            im_scale_x = size / float(w)
-            im_scale_y = size / float(h)
-            im = cv2.resize(im, None, None, fx=im_scale_x, fy=im_scale_y, interpolation=cv2.INTER_CUBIC)
+            # h, w, _ = im.shape
+            # im_scale_x = size / float(w)
+            # im_scale_y = size / float(h)
+            # im = cv2.resize(im, None, None, fx=im_scale_x, fy=im_scale_y, interpolation=cv2.INTER_CUBIC)
             
             mean = np.array(mean).reshape((1, 1, -1))
             std = np.array(std).reshape((1, 1, -1))

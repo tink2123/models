@@ -106,13 +106,13 @@ def parse_args():
     add_arg('start_iter',       int,    0,     "Start iteration.")
     #SOLVER
     add_arg('learning_rate',    float,  0.001,     "Learning rate.")
-    add_arg('max_iter',         int,    500000,   "Iter number.")
+    add_arg('max_iter',         int,    500200,   "Iter number.")
     add_arg('snapshot_iter',    int,    2000,    "Save model every snapshot stride.")
     add_arg('log_window',       int,    20,        "Log smooth window, set 1 for debug, set 20 for train.")
     # TRAIN TEST INFER
     add_arg('input_size',       int,    608,    "Image input size of YOLOv3.")
     add_arg('random_shape',     bool,   False,     "Resize to random shape for train reader")
-    add_arg('mixup_iter',       int,    0,      "The iter number to mixup two images")
+    add_arg('no_mixup_iter',    int,    4000,      "Disable mixup in last N iter.")
     add_arg('valid_thresh',     float,  0.01,    "Valid confidence score for NMS.")
     add_arg('nms_thresh',       float,  0.45,    "NMS threshold.")
     add_arg('nms_topk',         int,    400,    "The number of boxes to perform NMS.")
