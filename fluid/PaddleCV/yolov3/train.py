@@ -67,7 +67,7 @@ def train():
             warmup_iter=cfg.warm_up_iter,
             warmup_factor=cfg.warm_up_factor,
             start_step=cfg.start_iter),
-        regularization=fluid.regularizer.L2Decay(cfg.weight_decay),
+        regularization=fluid.regularizer.L2Decay(float(hyperparams['decay'])),
         momentum=float(hyperparams['momentum']))
     optimizer.minimize(loss)
 

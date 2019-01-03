@@ -55,9 +55,11 @@ def conv_bn_layer(input,
                                       is_test=not is_train,
                                       param_attr=ParamAttr(
                                             initializer=fluid.initializer.Normal(0., 0.02),
+                                            regularizer=L2Decay(0.),
                                             name=bn_name + '_scale'),
                                       bias_attr=ParamAttr(
                                             initializer=fluid.initializer.Constant(0.0),
+                                            regularizer=L2Decay(0.),
                                             name=bn_name + '_offset'),
                                       moving_mean_name=bn_name+'_mean',
                                       moving_variance_name=bn_name+'_var',
@@ -73,6 +75,7 @@ def conv_bn_layer(input,
             param_attr=ParamAttr(initializer=fluid.initializer.Normal(0., 0.02),
                                  name=name + "_weights"),
             bias_attr=ParamAttr(initializer=fluid.initializer.Constant(0.0),
+                                 regularizer=L2Decay(0.),
                                  name=name + "_bias"),
             name=name + '.conv2d.output.1')
 

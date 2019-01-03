@@ -83,7 +83,7 @@ _C.lr_steps = [400000, 450000]
 _C.lr_gamma = 0.1
 
 # L2 regularization hyperparameter
-_C.weight_decay = 0.0001
+_C.weight_decay = 0.0005
 
 # momentum with SGD
 _C.momentum = 0.9
