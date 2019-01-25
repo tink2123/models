@@ -65,8 +65,7 @@ def train():
             boundaries=boundaries,
             values=values,
             warmup_iter=cfg.warm_up_iter,
-            warmup_factor=cfg.warm_up_factor,
-            start_step=cfg.start_iter),
+            warmup_factor=cfg.warm_up_factor),
         regularization=fluid.regularizer.L2Decay(float(hyperparams['decay'])),
         momentum=float(hyperparams['momentum']))
     optimizer.minimize(loss)
@@ -93,7 +92,7 @@ def train():
 
     mixup_iter = cfg.max_iter - cfg.start_iter - cfg.no_mixup_iter
     if cfg.use_pyreader:
-        train_reader = reader.train(input_size, batch_size=int(hyperparams['batch'])/devices_num, shuffle=True, mixup_iter=mixup_iter, random_sizes=random_sizes, use_multiprocessing=cfg.use_multiprocess)
+        train_reader = reader.train(input_size, batch_size=int(hyperparams['batch'])/devices_num, shuffle=True, mixup_iter=mixup_iter*devices_num, random_sizes=random_sizes, use_multiprocessing=cfg.use_multiprocess)
         py_reader = model.py_reader
         py_reader.decorate_paddle_reader(train_reader)
     else:
