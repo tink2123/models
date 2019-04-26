@@ -20,11 +20,14 @@ from paddle.fluid.param_attr import ParamAttr
 from paddle.fluid.initializer import Constant
 from paddle.fluid.initializer import Normal
 from paddle.fluid.regularizer import L2Decay
+import  numpy as np
 
 from config import cfg
 
 from .darknet import add_DarkNet53_conv_body
 from .darknet import conv_bn_layer
+from .mobilenet import mobile_net
+from .resnet import add_ResNet_conv5_body
 
 def yolo_detection_block(input, channel, is_test=True, name=None):
     assert channel % 2 == 0, \
@@ -90,14 +93,28 @@ class YOLOv3(object):
             return [self.image, self.im_id, self.im_shape]
         return [self.image, self.gtbox, self.gtlabel, self.gtscore]
 
+    def get_backbone(self):
+        if "darknet53" in cfg.backbone:
+            self.backbone_conv_body = add_DarkNet53_conv_body(self.image, not self.is_train)
+        elif "mobilenet" in cfg.backbone:
+            self.backbone_conv_body = mobile_net(self.image, 1.0, not self.is_train)
+        else:
+            raise NotImplementedError('backbone {} is not in the following model: darknet53,mobilenet'.format(
+                cfg.backbone))
+    
     def build_model(self):
         self.build_input()
-
+        self.get_backbone()
         self.outputs = []
         self.boxes = []
         self.scores = []
 
-        blocks = add_DarkNet53_conv_body(self.image, not self.is_train)
+        # blocks = add_DarkNet53_conv_body(self.image, not self.is_train)
+        # blocks = mobile_net(self.image, 1.0, not self.is_train)
+        blocks = self.backbone_conv_body
+        #var = np.array(fluid.global_scope().find_var('conv2d_0.w_0').get_tensor())
+        #print(var)
+
         for i, block in enumerate(blocks):
             if i > 0:
                 block = fluid.layers.concat(
