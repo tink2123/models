@@ -58,12 +58,9 @@ def mobile_net(img, scale=1.0, is_test=True):
     # 304x304
     tmp = depthwise_separable(tmp, 32, 64, 32, 1, scale,is_test=is_test)
     tmp = depthwise_separable(tmp, 64, 128, 64, 2, scale,is_test=is_test)
-    # 75x75
+    # 76x76
     tmp = depthwise_separable(tmp, 128, 128, 128, 1, scale,is_test=is_test)
     tmp = depthwise_separable(tmp, 128, 256, 128, 2, scale,is_test=is_test)
-    scale1 = tmp
-    # print (scale1)
-    # fluid.layers.Print(scale1)
     # 1/8
     blocks.append(tmp)
     # 38x38
@@ -78,8 +75,5 @@ def mobile_net(img, scale=1.0, is_test=True):
     tmp = depthwise_separable(tmp, 512, 1024, 512, 2, scale,is_test=is_test)
     # 1/32
     blocks.append(tmp)  
-
-    # 10x10
-    module13 = depthwise_separable(tmp, 1024, 1024, 1024, 1, scale,is_test=is_test)
 
     return blocks[::-1]
