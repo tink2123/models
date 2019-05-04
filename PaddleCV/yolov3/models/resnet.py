@@ -25,6 +25,7 @@ def conv_bn_layer(input,
                   stride,
                   padding,
                   act='relu',
+                  is_test=True,
                   name=None):
     conv1 = fluid.layers.conv2d(
         input=input,
@@ -34,7 +35,7 @@ def conv_bn_layer(input,
         padding=padding,
         act=None,
         param_attr=ParamAttr(name=name + "_weights"),
-        bias_attr=ParamAttr(name=name + "_biases"),
+        bias_attr=False,
         name=name + '.conv2d.output.1')
     if name == "conv1":
         bn_name = "bn_" + name
@@ -49,7 +50,7 @@ def conv_bn_layer(input,
         bias_attr=ParamAttr(bn_name + '_offset'),
         moving_mean_name=bn_name + '_mean',
         moving_variance_name=bn_name + '_variance',
-        is_test=True)
+        is_test=is_test)
 
 
 def conv_affine_layer(input,
@@ -95,18 +96,18 @@ def conv_affine_layer(input,
     return out
 
 
-def shortcut(input, ch_out, stride, name):
+def shortcut(input, ch_out, stride, is_first, is_test=True,name=None):
     ch_in = input.shape[1]  # if args.data_format == 'NCHW' else input.shape[-1]
-    if ch_in != ch_out:
-        return conv_affine_layer(input, ch_out, 1, stride, 0, None, name=name)
+    if ch_in != ch_out or is_first == True:
+        return conv_bn_layer(input, ch_out, 1, stride, 0, None, is_test=is_test, name=name)
     else:
         return input
 
 
-def basicblock(input, ch_out, stride, name):
-    short = shortcut(input, ch_out, stride, name=name+"_short")
-    conv1 = conv_affine_layer(input, ch_out, 3, stride, 1, name=name+"_conv1")
-    conv2 = conv_affine_layer(conv1, ch_out, 3, 1, 1, act=None, name=name+"_conv2")
+def basicblock(input, ch_out, stride, is_first, is_test=True, name=None):
+    short = shortcut(input, ch_out, stride, is_first=is_first, is_test=is_test, name=name+"_branch1")
+    conv1 = conv_bn_layer(input, ch_out, 3, stride, 1, is_test=is_test, name=name+"_branch2a")
+    conv2 = conv_bn_layer(conv1, ch_out, 3, 1, 1, act=None, is_test=is_test, name=name+"_branch2b")
     return fluid.layers.elementwise_add(x=short, y=conv2, act='relu', name=name+"_add")
 
 
@@ -121,10 +122,10 @@ def bottleneck(input, ch_out, stride, name):
         x=short, y=conv3, act='relu', name=name + ".add.output.5")
 
 
-def layer_warp(block_func, input, ch_out, count, stride, name):
-    res_out = block_func(input, ch_out, stride, name=name + "a")
+def layer_warp(block_func, input, ch_out, count, stride, is_first, is_test=True, name=None):
+    res_out = block_func(input, ch_out, stride, is_first=is_first, is_test=is_test, name=name + "a")
     for i in range(1, count):
-        res_out = block_func(res_out, ch_out, 1, name=name + chr(ord("a") + i))
+        res_out = block_func(res_out, ch_out, 1, is_first=False, is_test=is_test, name=name + chr(ord("a") + i))
     return res_out
 
 
@@ -136,27 +137,19 @@ ResNet_cfg = {
     152: ([3, 8, 36, 3], bottleneck)
 }
 
-def add_ResNet_conv5_body(body_input,num_layers=18):
+def add_ResNet_conv5_body(body_input,num_layers=34,is_test=True):
     stages, block_func = ResNet_cfg[num_layers]
     stages = stages[0:4]
-    conv1 = conv_affine_layer(
-        body_input, ch_out=64, filter_size=7, stride=2, padding=3, name="conv1")
+    conv1 = conv_bn_layer(
+        body_input, ch_out=64, filter_size=7, stride=2, padding=3, is_test=is_test, name="conv1")
     pool1 = fluid.layers.pool2d(
         input=conv1,
         pool_type='max',
         pool_size=3,
         pool_stride=2,
         pool_padding=1)
-    res2 = layer_warp(block_func, pool1, 64, stages[0], 1, name="res2")
-    #if cfg.TRAIN.freeze_at == 2:
-    #    res2.stop_gradient = True
-    res3 = layer_warp(block_func, res2, 128, stages[1], 2, name="res3")
-    #if cfg.TRAIN.freeze_at == 3:
-    #    res3.stop_gradient = True
-    res4 = layer_warp(block_func, res3, 256, stages[2], 2, name="res4")
-    #if cfg.TRAIN.freeze_at == 4:
-    #    res4.stop_gradient = True
-    res5 = layer_warp(block_func, res4, 512, stages[3], 2, name="res5")
-    #if cfg.TRAIN.freeze_at == 4:
-    #    res4.stop_gradient = True        
+    res2 = layer_warp(block_func, pool1, 64, stages[0], 1, is_first=True, is_test=is_test, name="res2")
+    res3 = layer_warp(block_func, res2, 128, stages[1], 2, is_first=False, is_test=is_test, name="res3")
+    res4 = layer_warp(block_func, res3, 256, stages[2], 2, is_first=False, is_test=is_test, name="res4")
+    res5 = layer_warp(block_func, res4, 512, stages[3], 2, is_first=False, is_test=is_test, name="res5")
     return [res5,res4,res3]

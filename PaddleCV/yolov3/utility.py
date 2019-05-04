@@ -99,7 +99,7 @@ def parse_args():
     add_arg('pretrain',         str,    'weights/darknet53', "The pretrain model path.")
     add_arg('weights',          str,    'weights/yolov3', "The weights path.")
     add_arg('dataset',          str,    'coco2017',  "Dataset: coco2014, coco2017.")
-    add_arg('backbone',         str,    'darknet53', "backbone: darknet53,mobilenet.")    
+    add_arg('backbone',         str,    'darknet53', "backbone: resnet34,darknet53,mobilenet.")    
     add_arg('class_num',        int,    80,          "Class number.")
     add_arg('data_dir',         str,    'dataset/coco',        "The data root path.")
     add_arg('start_iter',       int,    0,      "Start iteration.")
