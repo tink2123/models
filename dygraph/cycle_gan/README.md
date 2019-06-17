@@ -114,7 +114,7 @@ env CUDA_VISIBLE_DEVICES=0 python infer.py \
 
 
 <p align="center">
-<img src="image/A2B.png" width="620" hspace='10'/> <br/>
+<img src="image/A2B.jpg" width="620" hspace='10'/> <br/>
 <strong>A2B</strong>
 </p>
 
