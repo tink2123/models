@@ -1,3 +1,16 @@
+#   Copyright (c) 2018 PaddlePaddle Authors. All Rights Reserved.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
 import os
 import sys
 sys.path.append('./so')
@@ -8,6 +21,7 @@ import numpy as np
 
 from ConfigParser import ConfigParser
 from PyCNNPredict import PyCNNPredict
+
 
 #infer detector
 def det_preprocessor(im, new_size, max_size):
@@ -20,15 +34,22 @@ def det_preprocessor(im, new_size, max_size):
     im /= img_std
     im_shape = im.shape
     im_size_min = np.min(im_shape[0:2])
-    im_size_max = np.max(im_shape[0:2])  
-    im_scale = float(new_size) / float(im_size_min)  
+    im_size_max = np.max(im_shape[0:2])
+    im_scale = float(new_size) / float(im_size_min)
     # Prevent the biggest axis from being more than max_size
     if np.round(im_scale * im_size_max) > max_size:
         im_scale = float(max_size) / float(im_size_max)
-    im = cv2.resize(im, None, None, fx=im_scale, fy=im_scale, interpolation=cv2.INTER_LINEAR)
+    im = cv2.resize(
+        im,
+        None,
+        None,
+        fx=im_scale,
+        fy=im_scale,
+        interpolation=cv2.INTER_LINEAR)
     channel_swap = (2, 0, 1)  #(batch, channel, height, width)
     im = im.transpose(channel_swap)
     return im, im_scale
+
 
 def nms(dets, thresh):
     """nms"""
@@ -58,6 +79,7 @@ def nms(dets, thresh):
         inds = np.where(ovr <= thresh)[0]
         order = order[inds + 1]
     return keep
+
 
 def box_decoder(deltas, boxes, weights):
     boxes = boxes.astype(deltas.dtype, copy=False)
@@ -89,6 +111,7 @@ def box_decoder(deltas, boxes, weights):
     pred_boxes[:, 3::4] = pred_ctr_y + 0.5 * pred_h - 1
     return pred_boxes
 
+
 def clip_tiled_boxes(boxes, im_shape):
     """Clip boxes to image boundaries. im_shape is [height, width] and boxes
     has shape (N, 4 * num_tiled_boxes)."""
@@ -101,6 +124,7 @@ def clip_tiled_boxes(boxes, im_shape):
     # y2 < im_shape[0]
     boxes[:, 3::4] = np.maximum(np.minimum(boxes[:, 3::4], im_shape[0] - 1), 0)
     return boxes
+
 
 def get_dt_res_common(rpn_rois_v, confs_v, locs_v, class_nums, im_info, im_id):
     dts_res = []
@@ -117,7 +141,8 @@ def get_dt_res_common(rpn_rois_v, confs_v, locs_v, class_nums, im_info, im_id):
         inds = np.where(confs_v[:, j] >= 0.1)[0]
         scores_j = confs_v[inds, j]
         rois_j = decoded_box_v[inds, j * 4:(j + 1) * 4]
-        dets_j = np.hstack((rois_j, scores_j[:, np.newaxis])).astype(np.float32, copy=False)
+        dets_j = np.hstack((rois_j, scores_j[:, np.newaxis])).astype(
+            np.float32, copy=False)
         cls_rank = np.argsort(-dets_j[:, -1])
         dets_j = dets_j[cls_rank]
         keep = nms(dets_j, 0.5)
@@ -125,7 +150,8 @@ def get_dt_res_common(rpn_rois_v, confs_v, locs_v, class_nums, im_info, im_id):
         cls_boxes[j] = nms_dets
 
     # Limit to max_per_image detections **over all classes**
-    image_scores = np.hstack([cls_boxes[j][:, -1] for j in range(1, class_nums)])
+    image_scores = np.hstack(
+        [cls_boxes[j][:, -1] for j in range(1, class_nums)])
     if len(image_scores) > 100:
         image_thresh = np.sort(image_scores)[-100]
         for j in range(1, class_nums):
@@ -146,6 +172,7 @@ def get_dt_res_common(rpn_rois_v, confs_v, locs_v, class_nums, im_info, im_id):
             dts_res.append(dt_res)
     return dts_res
 
+
 def test_det(img_path):
     conf_file = './conf/paddle-det.conf'
     prefix = 'paddle-classify_'
@@ -159,28 +186,32 @@ def test_det(img_path):
     im = cv2.imread(img_path)
     if im is None:
         print("image doesn't exist!")
-        sys.exit(-1) 
+        sys.exit(-1)
     img_height_ori = im.shape[0]
     img_width_ori = im.shape[1]
     im, im_scale = det_preprocessor(im, new_size, max_size)
     im_height = np.round(img_height_ori * im_scale)
-    im_width = np.round(img_width_ori * im_scale) 
+    im_width = np.round(img_width_ori * im_scale)
     im_info = np.array([im_height, im_width, im_scale], dtype=np.float32)
     im_data_shape = np.array([1, im.shape[0], im.shape[1], im.shape[2]])
     im_info_shape = np.array([1, 3])
     im = im.flatten().astype(np.float32)
     im_info = im_info.flatten().astype(np.float32)
     inputdatas = [im, im_info]
-    inputshapes = [im_data_shape.astype(np.int32), im_info_shape.astype(np.int32)]
+    inputshapes = [
+        im_data_shape.astype(np.int32), im_info_shape.astype(np.int32)
+    ]
     for ino in range(2):
-        starttime = time.time() 
+        starttime = time.time()
         res = predictor.predict(inputdatas, inputshapes, [])
         rpn_rois_v = res[0][0].reshape(-1, 4)
         confs_v = res[0][1].reshape(-1, class_nums)
         locs_v = res[0][2].reshape(-1, class_nums * 4)
-        dts_res = get_dt_res_common(rpn_rois_v, confs_v, locs_v, class_nums, im_info, 0)
+        dts_res = get_dt_res_common(rpn_rois_v, confs_v, locs_v, class_nums,
+                                    im_info, 0)
         print("Time:%.3f" % (time.time() - starttime))
     print(dts_res)
+
 
 ##infer cls 
 def normwidth(size, margin=32):
@@ -256,17 +287,18 @@ def test_cls(img_path, model_name):
     for ino in range(5):
         starttime = time.time()
         res = predictor.predict(inputdatas, inputshapes, [])
-        print "Time:", time.time() - starttime 
+        print "Time:", time.time() - starttime
 
     result = res[0][0]
     pred_label = np.argsort(result)[::-1][:1]
-    
+
     print(pred_label)
     print(result[pred_label])
 
+
 if __name__ == "__main__":
-    if len(sys.argv)>1 :
+    if len(sys.argv) > 1:
         func = getattr(sys.modules[__name__], sys.argv[1])
         func(*sys.argv[2:])
     else:
-        print >> sys.stderr,'tools.py command'
+        print >> sys.stderr, 'tools.py command'

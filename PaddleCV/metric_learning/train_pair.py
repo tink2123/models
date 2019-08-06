@@ -1,3 +1,16 @@
+#   Copyright (c) 2018 PaddlePaddle Authors. All Rights Reserved.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
 from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
@@ -33,7 +46,7 @@ add_arg('test_batch_size', int, 50, "Minibatch size.")
 add_arg('image_shape', str, "3,224,224", "input image size")
 add_arg('class_dim', int, 11318, "Class number.")
 add_arg('lr', float, 0.0001, "set learning rate.")
-add_arg('lr_strategy', str, "piecewise_decay",	"Set the learning rate decay strategy.")
+add_arg('lr_strategy', str, "piecewise_decay", "Set the learning rate decay strategy.")
 add_arg('lr_steps', str, "100000", "step of lr")
 add_arg('total_iter_num', int, 100000, "total_iter_num")
 add_arg('display_iter_step', int, 10, "display_iter_step.")
@@ -52,15 +65,17 @@ add_arg('npairs_reg_lambda', float, 0.01, "npairs reg lambda.")
 
 model_list = [m for m in dir(models) if "__" not in m]
 
+
 def optimizer_setting(params):
     ls = params["learning_strategy"]
     assert ls["name"] == "piecewise_decay", \
            "learning rate strategy must be {}, \
-           but got {}".format("piecewise_decay", lr["name"])
+           but got {}"
+                      .format("piecewise_decay", lr["name"])
 
     bd = [int(e) for e in ls["lr_steps"].split(',')]
     base_lr = params["lr"]
-    lr = [base_lr * (0.1 ** i) for i in range(len(bd) + 1)]
+    lr = [base_lr * (0.1**i) for i in range(len(bd) + 1)]
     optimizer = fluid.optimizer.Momentum(
         learning_rate=fluid.layers.piecewise_decay(
             boundaries=bd, values=lr),
@@ -70,37 +85,33 @@ def optimizer_setting(params):
 
 
 def net_config(image, label, model, args, is_train):
-    assert args.model in model_list, "{} is not in lists: {}".format(
-        args.model, model_list)
+    assert args.model in model_list, "{} is not in lists: {}".format(args.model,
+                                                                     model_list)
 
     out = model.net(input=image, embedding_size=args.embedding_size)
     if not is_train:
         return None, out
 
     if args.loss_name == "triplet":
-        metricloss = TripletLoss(
-                margin=args.margin,
-        )
+        metricloss = TripletLoss(margin=args.margin, )
     elif args.loss_name == "quadruplet":
         metricloss = QuadrupletLoss(
-                train_batch_size = args.train_batch_size,
-                samples_each_class = args.samples_each_class,
-                margin=args.margin,
-        )
+            train_batch_size=args.train_batch_size,
+            samples_each_class=args.samples_each_class,
+            margin=args.margin, )
     elif args.loss_name == "eml":
         metricloss = EmlLoss(
-                train_batch_size = args.train_batch_size,
-                samples_each_class = args.samples_each_class,
-        )
+            train_batch_size=args.train_batch_size,
+            samples_each_class=args.samples_each_class, )
     elif args.loss_name == "npairs":
         metricloss = NpairsLoss(
-                train_batch_size = args.train_batch_size,
-                samples_each_class = args.samples_each_class,
-                reg_lambda = args.npairs_reg_lambda,
-        )
+            train_batch_size=args.train_batch_size,
+            samples_each_class=args.samples_each_class,
+            reg_lambda=args.npairs_reg_lambda, )
     cost = metricloss.loss(out, label)
     avg_cost = fluid.layers.mean(x=cost)
     return avg_cost, out
+
 
 def build_program(is_train, main_prog, startup_prog, args):
     image_shape = [int(m) for m in args.image_shape.split(",")]
@@ -116,7 +127,8 @@ def build_program(is_train, main_prog, startup_prog, args):
                 use_double_buffer=True)
             image, label = fluid.layers.read_file(py_reader)
         else:
-            image = fluid.layers.data(name='image', shape=image_shape, dtype='float32')
+            image = fluid.layers.data(
+                name='image', shape=image_shape, dtype='float32')
             label = fluid.layers.data(name='label', shape=[1], dtype='int64')
 
         with fluid.unique_name.guard():
@@ -135,7 +147,7 @@ def build_program(is_train, main_prog, startup_prog, args):
     """
     if is_train:
         return py_reader, avg_cost, global_lr, out, label
-    else: 
+    else:
         return out, image, label
 
 
@@ -164,7 +176,9 @@ def train_async(args):
         args=args)
     test_prog = tmp_prog.clone(for_test=True)
 
-    train_fetch_list = [global_lr.name, train_cost.name, train_feas.name, train_label.name]
+    train_fetch_list = [
+        global_lr.name, train_cost.name, train_feas.name, train_label.name
+    ]
     test_fetch_list = [test_feas.name]
 
     if args.with_mem_opt:
@@ -192,9 +206,11 @@ def train_async(args):
     assert (args.train_batch_size % devicenum) == 0
     train_batch_size = args.train_batch_size / devicenum
     test_batch_size = args.test_batch_size
-    
-    train_reader = paddle.batch(reader.train(args), batch_size=train_batch_size, drop_last=True)
-    test_reader = paddle.batch(reader.test(args), batch_size=test_batch_size, drop_last=False)
+
+    train_reader = paddle.batch(
+        reader.train(args), batch_size=train_batch_size, drop_last=True)
+    test_reader = paddle.batch(
+        reader.test(args), batch_size=test_batch_size, drop_last=False)
     test_feeder = fluid.DataFeeder(place=place, feed_list=[image, label])
     train_py_reader.decorate_paddle_reader(train_reader)
 
@@ -229,12 +245,14 @@ def train_async(args):
             train_info = [0, 0, 0]
 
         totalruntime += period
-        
+
         if iter_no % args.test_iter_step == 0 and iter_no != 0:
             f, l = [], []
             for batch_id, data in enumerate(test_reader()):
                 t1 = time.time()
-                [feas] = exe.run(test_prog, fetch_list = test_fetch_list, feed=test_feeder.feed(data))
+                [feas] = exe.run(test_prog,
+                                 fetch_list=test_fetch_list,
+                                 feed=test_feeder.feed(data))
                 label = np.asarray([x[1] for x in data])
                 f.append(feas)
                 l.append(label)
@@ -261,6 +279,7 @@ def train_async(args):
 
         iter_no += 1
 
+
 def initlogging():
     for handler in logging.root.handlers[:]:
         logging.root.removeHandler(handler)
@@ -268,9 +287,9 @@ def initlogging():
     logging.basicConfig(
         level=loglevel,
         # logger.BASIC_FORMAT,
-        format=
-        "%(levelname)s:%(filename)s[%(lineno)s] %(name)s:%(funcName)s->%(message)s",
+        format="%(levelname)s:%(filename)s[%(lineno)s] %(name)s:%(funcName)s->%(message)s",
         datefmt='%a, %d %b %Y %H:%M:%S')
+
 
 def main():
     args = parser.parse_args()

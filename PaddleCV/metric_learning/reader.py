@@ -1,3 +1,16 @@
+#   Copyright (c) 2018 PaddlePaddle Authors. All Rights Reserved.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
 from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
@@ -57,11 +70,13 @@ def init_sop(mode):
         else:
             return test_image_list
 
+
 def common_iterator(data, settings):
     batch_size = settings.train_batch_size
     samples_each_class = settings.samples_each_class
     assert (batch_size % samples_each_class == 0)
-    class_num = batch_size // samples_each_class 
+    class_num = batch_size // samples_each_class
+
     def train_iterator():
         count = 0
         labs = list(data.keys())
@@ -86,9 +101,11 @@ def common_iterator(data, settings):
 
     return train_iterator
 
+
 def triplet_iterator(data, settings):
     batch_size = settings.train_batch_size
     assert (batch_size % 3 == 0)
+
     def train_iterator():
         total_count = settings.train_batch_size * (settings.total_iter_num + 1)
         count = 0
@@ -107,7 +124,7 @@ def triplet_iterator(data, settings):
             lab_neg = labs[ind_neg]
             neg_data_list = data[lab_neg]
             neg_ind = random.randint(0, len(neg_data_list) - 1)
-            
+
             anchor_path = DATA_DIR + pos_data_list[anchor_ind]
             yield anchor_path, lab_pos
             pos_path = DATA_DIR + pos_data_list[pos_ind]
@@ -119,6 +136,7 @@ def triplet_iterator(data, settings):
                 return
 
     return train_iterator
+
 
 def arcmargin_iterator(data, settings):
     def train_iterator():
@@ -132,23 +150,28 @@ def arcmargin_iterator(data, settings):
                 count += 1
                 if count >= total_count:
                     return
+
     return train_iterator
+
 
 def image_iterator(data, mode):
     def val_iterator():
         for items in data:
             path, label = items
-            path = DATA_DIR + path 
+            path = DATA_DIR + path
             yield path, label
+
     def test_iterator():
         for item in data:
             path = item
-            path = DATA_DIR + path 
+            path = DATA_DIR + path
             yield [path]
+
     if mode == 'val':
         return val_iterator
     else:
         return test_iterator
+
 
 def createreader(settings, mode):
     def metric_reader():
@@ -169,21 +192,29 @@ def createreader(settings, mode):
             return image_iterator(test_image_list, 'test')()
 
     image_shape = settings.image_shape.split(',')
-    assert(image_shape[1] == image_shape[2])
+    assert (image_shape[1] == image_shape[2])
     image_size = int(image_shape[2])
-    keep_order = False if mode != 'train' or settings.loss_name in ['softmax', 'arcmargin'] else True
-    image_mapper = functools.partial(process_image,
-            mode=mode, color_jitter=False, rotate=False, crop_size=image_size)
+    keep_order = False if mode != 'train' or settings.loss_name in [
+        'softmax', 'arcmargin'
+    ] else True
+    image_mapper = functools.partial(
+        process_image,
+        mode=mode,
+        color_jitter=False,
+        rotate=False,
+        crop_size=image_size)
     reader = paddle.reader.xmap_readers(
-            image_mapper, metric_reader, 8, 1000, order=keep_order)
+        image_mapper, metric_reader, 8, 1000, order=keep_order)
     return reader
 
 
-def train(settings): 
+def train(settings):
     return createreader(settings, "train")
+
 
 def test(settings):
     return createreader(settings, "val")
+
 
 def infer(settings):
     return createreader(settings, "test")

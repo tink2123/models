@@ -1,3 +1,16 @@
+#   Copyright (c) 2018 PaddlePaddle Authors. All Rights Reserved.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
 import os
 import sys
 sys.path.append('./so')
@@ -9,16 +22,19 @@ import numpy as np
 from ConfigParser import ConfigParser
 from PyCNNPredict import PyCNNPredict
 
+
 def normwidth(size, margin=32):
     outsize = size // margin * margin
     outsize = max(outsize, margin)
     return outsize
+
 
 def loadconfig(configurefile):
     "load config from file"
     config = ConfigParser()
     config.readfp(open(configurefile, 'r'))
     return config
+
 
 def resize_short(img, target_size):
     """ resize_short """
@@ -28,8 +44,10 @@ def resize_short(img, target_size):
 
     resized_width = normwidth(resized_width)
     resized_height = normwidth(resized_height)
-    resized = cv2.resize(img, (resized_width, resized_height), interpolation=cv2.INTER_LANCZOS4)
+    resized = cv2.resize(
+        img, (resized_width, resized_height), interpolation=cv2.INTER_LANCZOS4)
     return resized
+
 
 def crop_image(img, target_size, center):
     """ crop_image """
@@ -65,8 +83,10 @@ def preprocessor(img, crop_size):
 
     return img
 
+
 def cosinedist(a, b):
     return np.dot(a, b) / (np.sum(a * a) * np.sum(b * b))**0.5
+
 
 def test_retrieval(model_name):
     conf_file = './conf/paddle-retrieval.conf'
@@ -77,9 +97,7 @@ def test_retrieval(model_name):
     input_size = config.getint(prefix + 'predict', 'input_size')
 
     img_names = [
-        './test_data/0.jpg', 
-        './test_data/1.jpg', 
-        './test_data/2.jpg', 
+        './test_data/0.jpg', './test_data/1.jpg', './test_data/2.jpg',
         './test_data/3.jpg'
     ]
     img_feas = []
@@ -100,14 +118,15 @@ def test_retrieval(model_name):
         img_feas.append(fea)
         print("Time:", run_time)
 
-    for i in xrange(len(img_names)-1):
-        cosdist = cosinedist(img_feas[0], img_feas[i+1])
+    for i in xrange(len(img_names) - 1):
+        cosdist = cosinedist(img_feas[0], img_feas[i + 1])
         cosdist = max(min(cosdist, 1), 0)
-        print('cosine dist between {} and {}: {}'.format(0, i+1, cosdist))
+        print('cosine dist between {} and {}: {}'.format(0, i + 1, cosdist))
+
 
 if __name__ == "__main__":
-    if len(sys.argv)>1 :
+    if len(sys.argv) > 1:
         func = getattr(sys.modules[__name__], sys.argv[1])
         func(*sys.argv[2:])
     else:
-        print >> sys.stderr,'tools.py command'
+        print >> sys.stderr, 'tools.py command'

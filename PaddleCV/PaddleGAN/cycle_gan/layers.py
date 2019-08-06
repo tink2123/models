@@ -1,3 +1,16 @@
+#   Copyright (c) 2018 PaddlePaddle Authors. All Rights Reserved.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
 from __future__ import division
 import paddle.fluid as fluid
 import numpy as np
@@ -7,6 +20,7 @@ import os
 use_cudnn_conv2d_transpose = False
 use_cudnn_conv2d = True
 use_layer_norm = True
+
 
 def cal_padding(img_size, stride, filter_size, dilation=1):
     """Calculate padding size."""
@@ -21,7 +35,7 @@ def cal_padding(img_size, stride, filter_size, dilation=1):
 def instance_norm(input, name=None):
     # TODO(lvmengsi@baidu.com): Check the accuracy when using fluid.layers.layer_norm.
     if use_layer_norm:
-        return fluid.layers.layer_norm(input, begin_norm_axis=2) 
+        return fluid.layers.layer_norm(input, begin_norm_axis=2)
 
     helper = fluid.layer_helper.LayerHelper("instance_norm", **locals())
     dtype = helper.input_dtype()
