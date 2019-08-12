@@ -87,7 +87,7 @@ def conv_bn(input, out_channels, bn=True, act='relu', name=None):
                               dilation=1,
                               param_attr=param_attr,
                               bias_attr=bias_attr,
-                              act=act if not bn else None)
+			      act = act if not bn else None)
     if bn:
         bn_name = name + "_bn"
         out = fluid.layers.batch_norm(out,
@@ -99,23 +99,24 @@ def conv_bn(input, out_channels, bn=True, act='relu', name=None):
 
     return out
 
-def fc_bn(input,out_channels,bn=True,act='relu',name=None):
+def fc_bn(input,out_channels,bn=False,act='relu',name=None):
     param_attr = ParamAttr(name='{}_fc_weight'.format(name),
-                           initializer=fluid.initializer.Constant(1.0))
+                           initializer=fluid.initializer.Constant(2.4))
     if not bn:
         bias_attr = ParamAttr(name='{}_fc_bias'.format(name),
-                              initializer=fluid.initializer.Constan(0.0))
+                              initializer=fluid.initializer.Constant(1.4))
     else:
-        bias_attr = None
+        bias_attr = False
     out = fluid.layers.fc(input,
                           size=out_channels,
 			  param_attr=param_attr,
 			  bias_attr=bias_attr,
-			  act=act if not bn else None)
+			  act=act)
     if bn:
         out = fluid.layers.batch_norm(out,
                                       param_attr=ParamAttr(initializer=fluid.initializer.Constant(2.673)),
                                       bias_attr=ParamAttr(initializer=fluid.initializer.Constant(1.467)))
+    out = fluid.layers.relu(out)
     return out
 
 def MLP(features, out_channels_list, bn=True, act='relu', name=None):

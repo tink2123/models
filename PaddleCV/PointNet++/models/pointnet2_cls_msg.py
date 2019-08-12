@@ -60,21 +60,23 @@ class PointNet2MSGCls(object):
                     name="sa_{}".format(i),
                     **SA_conf)
 	#feature:[-1.1.1024]
-	#print("feature:",feature)
+	#transpose_10.tmp_0
 	out = fluid.layers.transpose(feature,perm=[0,2,1])
 	print("before squeeze:",out.shape)
         out = fluid.layers.squeeze(feature,axes=[])
-	print("start fc:",out.shape)
+
 	out = fc_bn(out,out_channels=512,bn=True,name="fc_1")
-        out = fluid.layers.dropout(out, 0.5)
+	print("fc_1:",out)
+        #out = fluid.layers.dropout(out, 0.5)
         out = fc_bn(out,out_channels=256,bn=True,name="fc_2")
-        out = fluid.layers.dropout(out, 0.5)
+	print("fc_1:",out)
+        #out = fluid.layers.dropout(out, 0.5)
         out = fc_bn(out,out_channels=self.num_classes,act=None,name="fc_3")
-	print("befor squeeze:",out.shape)
+	print("fc_3:",out)
         #out = fluid.layers.squeeze(out, axes=[-1])
 	#print("out:",out)
         pred = fluid.layers.softmax(out)
-	print("pred:",pred.shape)
+	#print("pred:",pred)
 	print("label:",self.label.shape)
 
         # calc loss
@@ -132,7 +134,7 @@ if __name__ == "__main__":
     exe = fluid.Executor(place)
     exe.run(fluid.default_startup_program())
 
-    np.random.seed(2333)
+    np.random.seed(1333)
     xyz_np = np.random.uniform(-100, 100, (8, 32, 3)).astype('float32')
     feature_np = np.random.uniform(-100, 100, (8, 32, 6)).astype('float32')
     label_np = np.random.uniform(0, num_classes, (8, 1)).astype('int64')
@@ -140,7 +142,7 @@ if __name__ == "__main__":
     #print("feaure", feature_np)
     #print("label", label_np)
     ret = exe.run(fetch_list=[out.name for out in outs], feed={'xyz': xyz_np, 'feature': feature_np, 'label': label_np})
-    #ret = exe.run(fetch_list=["transpose_17.tmp_0", outs[0].name, outs[1].name], feed={'xyz': xyz_np, 'feature': feature_np, 'label': label_np})
+    #ret = exe.run(fetch_list=["relu_0.tmp_0","relu_1.tmp_0","relu_2.tmp_0", outs[0].name, outs[1].name], feed={'xyz': xyz_np, 'feature': feature_np, 'label': label_np})
     print(ret)
     # print("ret0", ret[0].shape, ret[0])
     # ret[0].tofile("out.data")
