@@ -25,7 +25,7 @@ import paddle.fluid as fluid
 from paddle.fluid.param_attr import ParamAttr
 from paddle.fluid.initializer import Constant
 
-__all__ = ["conv_bn", "pointnet_sa_module", "pointnet_fp_module"]
+__all__ = ["conv_bn", "pointnet_sa_module", "pointnet_fp_module","fc_bn"]
 
 
 def query_and_group(xyz, new_xyz, radius, nsample, features=None, use_xyz=True):
@@ -47,12 +47,12 @@ def query_and_group(xyz, new_xyz, radius, nsample, features=None, use_xyz=True):
     grouped_xyz = fluid.layers.group_points(xyz, idx)
     expand_new_xyz = fluid.layers.unsqueeze(new_xyz, axes=[2])
     expand_new_xyz = fluid.layers.expand(expand_new_xyz, [1, 1, grouped_xyz.shape[2], 1])
-    grouped_xyz -= expand_new_xyz 
+    grouped_xyz -= expand_new_xyz
 
     if features is not None:
-        grouped_feaures = fluid.layers.group_points(features, idx)
-        return fluid.layers.concat([grouped_xyz, grouped_feaures], axis=-1) \
-                if use_xyz else grouped_feaures
+        grouped_features = fluid.layers.group_points(features, idx)
+        return fluid.layers.concat([grouped_xyz, grouped_features], axis=-1) \
+                if use_xyz else grouped_features
     else:
         assert use_xyz, "use_xyz should be True when features is None"
         return grouped_xyz
@@ -63,10 +63,12 @@ def group_all(xyz, features=None, use_xyz=True):
     Group all xyz and features when npoint is None
     See query_and_group
     """
-    grouped_xyz = fluid.layers.unsqueeze(xyz, axes=[2])
+    grouped_xyz = fluid.layers.unsqueeze(xyz, axes=[2]) #[-1,128,1,3]
+    #print("grouped_xyz:",grouped_xyz)
     if features is not None:
-        grouped_feaures = fluid.layers.unsqueeze(features, axes=[2])
-        return fluid.layers.concat([grouped_xyz, grouped_feaures], axis=1) if use_xyz else grouped_feaures
+        grouped_features = fluid.layers.unsqueeze(features, axes=[2]) # [-1,128,1,640]
+	#print("grouped_features:",grouped_features)
+        return fluid.layers.concat([grouped_xyz, grouped_features], axis=-1) if use_xyz else grouped_features
     else:
         return grouped_xyz
 
@@ -97,6 +99,24 @@ def conv_bn(input, out_channels, bn=True, act='relu', name=None):
 
     return out
 
+def fc_bn(input,out_channels,bn=True,act='relu',name=None):
+    param_attr = ParamAttr(name='{}_fc_weight'.format(name),
+                           initializer=fluid.initializer.Constant(1.0))
+    if not bn:
+        bias_attr = ParamAttr(name='{}_fc_bias'.format(name),
+                              initializer=fluid.initializer.Constan(0.0))
+    else:
+        bias_attr = None
+    out = fluid.layers.fc(input,
+                          size=out_channels,
+			  param_attr=param_attr,
+			  bias_attr=bias_attr,
+			  act=act if not bn else None)
+    if bn:
+        out = fluid.layers.batch_norm(out,
+                                      param_attr=ParamAttr(initializer=fluid.initializer.Constant(2.673)),
+                                      bias_attr=ParamAttr(initializer=fluid.initializer.Constant(1.467)))
+    return out
 
 def MLP(features, out_channels_list, bn=True, act='relu', name=None):
     out = features
@@ -136,20 +156,26 @@ def pointnet_sa_module(xyz,
             "radiuss, nsamples, mlps length should be same"
 
     farthest_idx = fluid.layers.farthest_point_sampling(xyz, npoint)
-    new_xyz = fluid.layers.gather_point(xyz, farthest_idx)
+    new_xyz = fluid.layers.gather_point(xyz, farthest_idx) if npoint is not None else None
 
     out = None
     if feature is not None:
         outs = []
         for i, (radius, nsample, mlp) in enumerate(zip(radiuss, nsamples, mlps)):
             out = query_and_group(xyz, new_xyz, radius, nsample, feature, use_xyz) if npoint is not None else group_all(xyz, feature, use_xyz)
-            out = fluid.layers.transpose(out, perm=[0, 3, 1, 2])
+            out = fluid.layers.transpose(out, perm=[0, 3, 1, 2])#[-1,643,128,1]
             out = MLP(out, mlp, bn=bn, name=name + '_mlp{}'.format(i)) # TODO(dengkaipeng): mlp[1:] ?
+	    if npoint is None:
+	        out = fluid.layers.transpose(out,perm=[0,1,3,2])
+	    # [-1,1024,128,1]
+	    #print("before pool:",out.shape)
             out = fluid.layers.pool2d(out, pool_size=[1, out.shape[3]], pool_type='max')
+	    #print("after pool:",out.shape)
             out = fluid.layers.squeeze(out, axes=[-1])
             outs.append(out)
         out = fluid.layers.concat(outs, axis=1)
         out = fluid.layers.transpose(out, perm=[0, 2, 1])
+    print("sa_module_out:",out.shape)
 
     return (new_xyz, out)
 
@@ -195,7 +221,7 @@ def pointnet_fp_module(unknown, known, unknown_feats, known_feats, mlp, bn=True,
 if __name__ == "__main__":
     xyz = fluid.layers.data(name='xyz', shape=[9, 3], dtype='float32')
     xyz_feats = fluid.layers.data(name='xyz_feats', shape=[12, 18], dtype='float32')
-    new_xyz, out = pointnet_sa_module_msg(xyz, 4, [0.8, 1.6], [6, 3], [[3, 6], [6, 9]], xyz_feats, name="test")
+    new_xyz, out = pointnet_sa_module(xyz, 4, [0.8, 1.6], [6, 3], [[3, 6], [6, 9]], xyz_feats, name="test")
 
     place = fluid.CUDAPlace(0)
     exe = fluid.Executor(place)
