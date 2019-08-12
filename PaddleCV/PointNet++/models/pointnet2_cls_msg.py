@@ -62,22 +62,14 @@ class PointNet2MSGCls(object):
 	#feature:[-1.1.1024]
 	#transpose_10.tmp_0
 	out = fluid.layers.transpose(feature,perm=[0,2,1])
-	print("before squeeze:",out.shape)
-        out = fluid.layers.squeeze(feature,axes=[])
+        out = fluid.layers.squeeze(out,axes=[-1])
 
 	out = fc_bn(out,out_channels=512,bn=True,name="fc_1")
-	print("fc_1:",out)
-        #out = fluid.layers.dropout(out, 0.5)
+        out = fluid.layers.dropout(out, 0.5)
         out = fc_bn(out,out_channels=256,bn=True,name="fc_2")
-	print("fc_1:",out)
-        #out = fluid.layers.dropout(out, 0.5)
+        out = fluid.layers.dropout(out, 0.5)
         out = fc_bn(out,out_channels=self.num_classes,act=None,name="fc_3")
-	print("fc_3:",out)
-        #out = fluid.layers.squeeze(out, axes=[-1])
-	#print("out:",out)
         pred = fluid.layers.softmax(out)
-	#print("pred:",pred)
-	print("label:",self.label.shape)
 
         # calc loss
         self.loss = fluid.layers.cross_entropy(pred, self.label)

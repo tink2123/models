@@ -64,10 +64,8 @@ def group_all(xyz, features=None, use_xyz=True):
     See query_and_group
     """
     grouped_xyz = fluid.layers.unsqueeze(xyz, axes=[2]) #[-1,128,1,3]
-    #print("grouped_xyz:",grouped_xyz)
     if features is not None:
         grouped_features = fluid.layers.unsqueeze(features, axes=[2]) # [-1,128,1,640]
-	#print("grouped_features:",grouped_features)
         return fluid.layers.concat([grouped_xyz, grouped_features], axis=-1) if use_xyz else grouped_features
     else:
         return grouped_xyz
@@ -169,14 +167,11 @@ def pointnet_sa_module(xyz,
 	    if npoint is None:
 	        out = fluid.layers.transpose(out,perm=[0,1,3,2])
 	    # [-1,1024,128,1]
-	    #print("before pool:",out.shape)
             out = fluid.layers.pool2d(out, pool_size=[1, out.shape[3]], pool_type='max')
-	    #print("after pool:",out.shape)
             out = fluid.layers.squeeze(out, axes=[-1])
             outs.append(out)
         out = fluid.layers.concat(outs, axis=1)
         out = fluid.layers.transpose(out, perm=[0, 2, 1])
-    print("sa_module_out:",out.shape)
 
     return (new_xyz, out)
 
