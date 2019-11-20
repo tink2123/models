@@ -28,7 +28,7 @@ from .pointnet2_modules_dy import *
 #from pointnet2_modules_dy import *
 from paddle.fluid.dygraph.base import to_variable
 
-__all__ = ["PointNet2ClsMSG_dy"]
+__all__ = ["PointNet2ClsMSG_dy", "PointNet2ClsSSG_dy"]
 
 
 class PointNet2ClsMSG_dy(fluid.dygraph.Layer):
@@ -52,17 +52,13 @@ class PointNet2ClsMSG_dy(fluid.dygraph.Layer):
         self.fc_1 = FCBN(self.full_name(),out_channel=256,bn=True)
         self.fc_2 = FCBN(self.full_name(),out_channel=self.num_classes,bn=False,act=None)
     def forward(self, xyz,label):
-        #print("=========== START in Model========")
         xyz,feature = self.sa_module_msg_0(xyz,feature=None)
         feature = fluid.layers.transpose(feature,perm=[0,2,1])
-	# to fix transpose
-	tmp = feature+0.0
+        # to fix transpose
+        tmp = feature+0.0
         xyz,feature = self.sa_module_msg_1(xyz,feature=tmp)
         feature = fluid.layers.transpose(feature,perm=[0,2,1])
         xyz,feature = self.sa_module(xyz,feature=feature)
-        #out = fluid.layers.transpose(feature, perm=[0, 2, 1])
-        #out = fluid.layers.squeeze(out, axes=[-1])
-        #print("squeeze input:",feature.shape)
         out = squeeze(feature,axis=-1)
         # FC layer
         out = self.fc_0(out)
@@ -70,20 +66,10 @@ class PointNet2ClsMSG_dy(fluid.dygraph.Layer):
         out = self.fc_1(out)
         out = fluid.layers.dropout(out,0.5,dropout_implementation="upscale_in_train")
         out = self.fc_2(out)
-        #print("out:",out.numpy())	
-	#out = fluid.layers.squeeze(out,axes=[-1])
 
-	pred = fluid.layers.softmax(out)
-
-
-        # calc loss
-	# label_onehot = fluid.layers.one_hot(label,depth=self.num_classes)
-	# label_float = fluid.layers.cast(label_onehot,dtype="float32")
-	# loss = fluid.layers.sigmoid_cross_entropy_with_logits(out,label_float)
-	# loss = fluid.layers.reduce_mean(loss)
+        pred = fluid.layers.softmax(out)
 
         loss = fluid.layers.cross_entropy(pred,label)
-	#tmp = pred
         loss = fluid.layers.reduce_mean(loss)
 
         # calc acc
@@ -102,6 +88,63 @@ class PointNet2ClsMSG_dy(fluid.dygraph.Layer):
         self.fc_1.set_bn_momentum(bn_momentum)
         self.fc_2.set_bn_momentum(bn_momentum)
 
+
+class PointNet2ClsSSG_dy(fluid.dygraph.Layer):
+    def __init__(self, name_scope, num_classes, num_points, use_xyz=True):
+        super(PointNet2ClsMSG_dy,self).__init__(name_scope)
+        self.num_classes = num_classes
+        self.num_points = num_points
+        self.use_xyz = use_xyz
+        self.sa_module_msg_0 = Pointnet_SA_Module_MSG(self.full_name(),
+                                                  npoint=512,
+                                                  radiuss=[0.2],
+                                                  nsamples=[64],
+                                                  mlps=[[64,64,128]])
+        self.sa_module_msg_1 = Pointnet_SA_Module_MSG(self.full_name(),
+                                                      npoint=128,
+                                                      radiuss=[0.4],
+                                                      nsamples=[64],
+                                                      mlps=[[128,128,256]])
+        self.sa_module = Pointnet_SA_Module_MSG(self.full_name(),radiuss=[None],nsamples=[None],mlps=[[256,512,1024]])
+        self.fc_0 = FCBN(self.full_name(),out_channel=512,bn=True)
+        self.fc_1 = FCBN(self.full_name(),out_channel=256,bn=True)
+        self.fc_2 = FCBN(self.full_name(),out_channel=self.num_classes,bn=False,act=None)
+    def forward(self, xyz,label):
+        xyz,feature = self.sa_module_msg_0(xyz,feature=None)
+        feature = fluid.layers.transpose(feature,perm=[0,2,1])
+        # to fix transpose
+        tmp = feature+0.0
+        xyz,feature = self.sa_module_msg_1(xyz,feature=tmp)
+        feature = fluid.layers.transpose(feature,perm=[0,2,1])
+        xyz,feature = self.sa_module(xyz,feature=feature)
+        out = squeeze(feature,axis=-1)
+        # FC layer
+        out = self.fc_0(out)
+        out = fluid.layers.dropout(out,0.5,dropout_implementation="upscale_in_train")
+        out = self.fc_1(out)
+        out = fluid.layers.dropout(out,0.5,dropout_implementation="upscale_in_train")
+        out = self.fc_2(out)
+
+        pred = fluid.layers.softmax(out)
+
+        loss = fluid.layers.cross_entropy(pred,label)
+        loss = fluid.layers.reduce_mean(loss)
+
+        # calc acc
+        pred = fluid.layers.reshape(out,shape=[-1,self.num_classes])
+        label = fluid.layers.reshape(label,shape=[-1,1])
+        acc1 = fluid.layers.accuracy(pred,label,k=1)
+        #acc2 = fluid.layers.accuracy(pred,label,k=5)
+        return out,loss,acc1
+
+    def set_bn_momentum(self, bn_momentum):
+        self.sa_module_msg_0.set_bn_momentum(bn_momentum)
+        self.sa_module_msg_1.set_bn_momentum(bn_momentum)
+        self.sa_module.set_bn_momentum(bn_momentum)
+    
+        self.fc_0.set_bn_momentum(bn_momentum)
+        self.fc_1.set_bn_momentum(bn_momentum)
+        self.fc_2.set_bn_momentum(bn_momentum)
 
 
 if __name__ == "__main__":

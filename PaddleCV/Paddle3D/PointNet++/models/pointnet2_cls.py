@@ -67,7 +67,7 @@ class PointNet2Cls(object):
         out = fluid.layers.transpose(feature, perm=[0, 2, 1])
         out = fluid.layers.squeeze(out,axes=[-1])
         #print("after sa module:",out.shape)
-	out = fc_bn(out,out_channels=512, bn=True, bn_momentum=bn_momentum, name="fc_1")
+        out = fc_bn(out,out_channels=512, bn=True, bn_momentum=bn_momentum, name="fc_1")
         out = fluid.layers.dropout(out, 0.5, dropout_implementation="upscale_in_train")
         out = fc_bn(out,out_channels=256, bn=True, bn_momentum=bn_momentum, name="fc_2")
         out = fluid.layers.dropout(out, 0.5, dropout_implementation="upscale_in_train")

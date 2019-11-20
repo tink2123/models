@@ -67,21 +67,16 @@ def query_and_group(xyz, new_xyz, radius, nsample, features=None, use_xyz=True):
     Returns:
         out (Variable): features with shape [B, npoint, nsample, C + 3]
     """
-    #idx = fluid.layers.query_ball(xyz, new_xyz, radius, nsample)
     idx = query_ball(xyz, new_xyz, radius, nsample)
     idx.stop_gradient = True
-    #grouped_xyz = fluid.layers.group_points(xyz, idx)
     grouped_xyz = group_points(xyz, idx)
-    # expand_new_xyz = fluid.layers.unsqueeze(new_xyz, axes=[2])
     expand_new_xyz = unsqueeze(new_xyz, axis=2)
     expand_new_xyz = fluid.layers.expand(expand_new_xyz, [1, 1, grouped_xyz.shape[2], 1])
     grouped_xyz -= expand_new_xyz
 
     if features is not None:
-        #grouped_feaures = fluid.layers.group_points(features, idx)
         new_feature = to_variable(features.numpy())
         grouped_features = group_points(new_feature, idx)
-        #grouped_features = group_points(features, idx)
         return fluid.layers.concat([grouped_xyz, grouped_features], axis=-1) \
                 if use_xyz else grouped_features
     else:
@@ -93,13 +88,9 @@ def group_all(xyz, features=None, use_xyz=True):
     Group all xyz and features when npoint is None
     See query_and_group
     """
-    # grouped_xyz = fluid.layers.unsqueeze(xyz, axes=[2]) #[-1,128,1,3]
     grouped_xyz = unsqueeze(xyz, axis=2) #[-1,128,1,3]
-    #print("grouped_xyz:",grouped_xyz)
     if features is not None:
-        # grouped_features = fluid.layers.unsqueeze(features, axes=[2]) # [-1,128,1,640]
         grouped_features = unsqueeze(features, axis=2)# [-1,128,1,640]
-	#print("grouped_features:",grouped_features)
         return fluid.layers.concat([grouped_xyz, grouped_features], axis=-1) if use_xyz else grouped_features
     else:
         return grouped_xyz
@@ -118,7 +109,6 @@ class ConvBN(fluid.dygraph.Layer):
                  bn_momentum=0.99):
         super(ConvBN,self).__init__(name_scope)
 
-        #param_attr = ParamAttr(name='conv_weight',initializer=fluid.initializer.Constant(1.376))
         param_attr = ParamAttr(name='conv_weight')
         if bn:
             bias_attr = False
@@ -126,14 +116,11 @@ class ConvBN(fluid.dygraph.Layer):
                                 num_channels=num_filters,
                                 act=act,
 				momentum=bn_momentum,
-                                #param_attr=ParamAttr(name="scale",initializer=fluid.initializer.Constant(2.673)),
                                 param_attr = ParamAttr(name='conv_weight'),
-                                #bias_attr=ParamAttr(name="offset",initializer=fluid.initializer.Constant(1.467)),
                                 bias_attr=ParamAttr(name="offset"),
                                 moving_mean_name="mean",
                                 moving_variance_name="var")
         else:
-            #bias_attr = ParamAttr(name='conv_bias',initializer=fluid.initializer.Constant(0.213))
             bias_attr = ParamAttr(name='conv_bias')
         self.conv = Conv2D(
             self.full_name(),
@@ -168,25 +155,19 @@ class FCBN(fluid.dygraph.Layer):
                  bn_momentum=0.99):
         super(FCBN,self).__init__(name_scope)
 
-        #fc_param_attr = ParamAttr(name="fc_weight",initializer=fluid.initializer.Constant(2.4))
         fc_param_attr = ParamAttr(name="fc_weight")
         if not bn:
-            #fc_bias_attr = ParamAttr(name="fc_bias",initializer=fluid.initializer.Constant(1.4))
             fc_bias_attr = ParamAttr(name="fc_bias")
         else:
             fc_bias_attr = False
             self.BN = BatchNorm(self.full_name(),
                                 num_channels=out_channel,
-                                #act=act,
-				momentum=bn_momentum,)
-                                #param_attr=ParamAttr(initializer=fluid.initializer.Constant(2.673)),
-                                #bias_attr=ParamAttr(initializer=fluid.initializer.Constant(1.467)))
+                                momentum=bn_momentum,)
 	    print("momentum:",self.BN._momentum)
         self.fc = FC(self.full_name(),
                      size=out_channel,
                      param_attr=fc_param_attr,
                      bias_attr=fc_bias_attr)
-                     #act=act if not bn else None)
         self.bn = bn
 	self.act = act
 
@@ -275,29 +256,26 @@ class Pointnet_SA_Module_MSG(fluid.dygraph.Layer):
     def forward(self, xyz, feature=None):
         assert len(self.radiuss) == len(self.nsamples) == len(self.mlps), \
             "radiuss, nsamples, mlps length should be same"
-        #farthest_idx = fluid.layers.farthest_point_sampling(xyz, self.npoint)
+
         if self.npoint is not None:
             farthest_idx = farthest_point_sampling(xyz, self.npoint)
             farthest_idx.stop_gradient = True
-        #new_xyz = fluid.layers.gather_point(xyz, farthest_idx)
+
         new_xyz = gather_point(xyz, farthest_idx) if self.npoint is not None else None
-        #print("self.npoint is None,new_xyz=",new_xyz)
         outs = []
         for i , (radius, nsample, mlp) in enumerate(zip(self.radiuss,self.nsamples,self.build_mlp_list)):
-            #out = query_and_group(xyz, new_xyz, radius, nsample, feature, self.use_xyz)
             out = query_and_group(xyz, new_xyz, radius, nsample, feature, self.use_xyz) \
                 if self.npoint is not None else group_all(xyz, feature, self.use_xyz)
             tmp = out+0.0
             out = fluid.layers.transpose(tmp, perm=[0, 3, 1, 2])
             out = mlp(out)
 	    if self.npoint is None:
-	       out = fluid.layers.transpose(out,perm=[0,1,3,2])
+            out = fluid.layers.transpose(out,perm=[0,1,3,2])
             out = fluid.layers.pool2d(out, pool_size=[1, out.shape[3]], pool_type='max')
-            # out = fluid.layers.squeeze(out, axes=[-1])
             out = squeeze(out, axis=-1)
             outs.append(out)
         out = fluid.layers.concat(outs,axis=1)
-	#out = fluid.layers.transpose(out,perm=[0,2,1])
+
         return(new_xyz,out)
 
 
@@ -334,7 +312,6 @@ class Pointnet_FP_module(fluid.dygraph.Layer):
         if known is None:
             interp_feats = fluid.layers.expand()
         else:
-            #dist, idx = fluid.layers.three_nn(unknown, known, eps=0)
             dist, idx = three_nn(unknown, known, eps=0)
 	    dist.stop_gradient = True
 	    idx.stop_gradient = True
@@ -343,18 +320,15 @@ class Pointnet_FP_module(fluid.dygraph.Layer):
             dist_recip = ones / (dist + 1e-8)
             norm = fluid.layers.reduce_sum(dist_recip,dim=-1,keep_dim=True)
             weight = dist_recip / norm
+
 	    weight.stop_gradient = True
-            #interp_feats = fluid.layers.three_interp(known_feats,weight,idx)
-            interp_feats = three_interp(known_feats,weight,idx)
+        interp_feats = three_interp(known_feats,weight,idx)
         new_features = interp_feats if unknown_feats is None else \
             fluid.layers.concat([interp_feats, unknown_feats], axis=-1)
         new_features = fluid.layers.transpose(new_features, perm=[0,2,1])
-        # new_features = fluid.layers.unsqueeze(new_features, axes=[-1])
         new_features = unsqueeze(new_features, axis=-1)
         new_features = self.MLP(new_features)
-        # new_features = fluid.layers.squeeze(new_features, axes=[-1])
         new_features = squeeze(new_features, axis=-1)
-        #new_features = fluid.layers.transpose(new_features, perm=[0,2,1])
         return new_features
 
     def set_bn_momentum(self, momentum):
