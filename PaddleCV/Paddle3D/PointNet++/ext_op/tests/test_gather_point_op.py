@@ -18,7 +18,8 @@ import unittest
 import numpy as np
 import paddle.fluid as fluid
 import pointnet_lib
-
+from paddle.fluid.dygraph.base import to_variable
+from paddle.fluid import core
 
 def gather_point_np(points, index):
     result = []
@@ -26,7 +27,12 @@ def gather_point_np(points, index):
         a = points[i][index[i]]
         result.append(a.tolist())
     return result
-
+class ABC(fluid.dygraph.Layer):
+    def __init__(self, name_scope):
+        super(ABC, self).__init__(name_scope)
+    def forward(self,points,index):
+        x = pointnet_lib.gather_point(points, index)
+        return x
 
 class TestGatherPointOp(unittest.TestCase):
     def test_check_output(self):
@@ -34,23 +40,18 @@ class TestGatherPointOp(unittest.TestCase):
         x_type = 'float32'
         idx_shape = (1, 32)
         idx_type = 'int32'
-
-        x = fluid.layers.data(
-            name='x', shape=x_shape, dtype=x_type, append_batch_size=False)
-        idx = fluid.layers.data(
-            name='idx', shape=idx_shape, dtype=idx_type, append_batch_size=False)
-        y = pointnet_lib.gather_point(x, idx)
-
-        x_np = np.random.uniform(-10, 10, x_shape).astype(x_type)
-        idx_np = np.random.randint(0, x_shape[1], idx_shape).astype(idx_type)
-        out_np = gather_point_np(x_np, idx_np)
-
-        place = fluid.CUDAPlace(0)
-        exe = fluid.Executor(place)
-        outs = exe.run(feed={'x': x_np, 'idx': idx_np}, fetch_list=[y])
-
-        self.assertTrue(np.allclose(outs[0], out_np))
-
-
+        place = fluid.CUDAPlace(0)        
+        with fluid.dygraph.guard(place):
+            x_np = np.random.uniform(-10, 10, x_shape).astype(x_type)
+            idx_np = np.random.randint(0, x_shape[1], idx_shape).astype(idx_type)
+            out_np = gather_point_np(x_np, idx_np)
+            x = to_variable(x_np)
+            idx = to_variable(idx_np)
+            #y = pointnet_lib.gather_point(x, idx)   
+            abc = ABC("abc")
+            y = abc(x,idx)
+            out = y.numpy()
+            print("out:",out)
+            self.assertTrue(np.allclose(out, out_np)) 
 if __name__ == "__main__":
     unittest.main()

@@ -18,7 +18,7 @@ import unittest
 import numpy as np
 import paddle.fluid as fluid
 import pointnet_lib
-
+from paddle.fluid.dygraph.base import to_variable
 
 def group_points_np(x, idx):
     b, m, s = idx.shape
@@ -34,26 +34,28 @@ def group_points_np(x, idx):
 
 class TestGroupPointsOp(unittest.TestCase):
     def test_check_output(self):
-        x_shape = [8, 43, 29]
+        x_shape = [8, 512, 320]
         x_type = 'float32'
-        idx_shape = [8, 37, 41]
+        idx_shape = [8, 128, 32]
         idx_type = 'int32'
 
-        x = fluid.layers.data(
-            name='x', shape=x_shape, dtype=x_type, append_batch_size=False)
-        idx = fluid.layers.data(
-            name='idx', shape=idx_shape, dtype=idx_type, append_batch_size=False)
-        y = pointnet_lib.group_points(x, idx)
-
-        x_np = np.random.uniform(-10, 10, x_shape).astype(x_type)
-        idx_np = np.random.randint(0, x_shape[1], idx_shape).astype(idx_type)
-        out_np = group_points_np(x_np, idx_np)
-
+        #x = fluid.layers.data(
+        #    name='x', shape=x_shape, dtype=x_type, append_batch_size=False)
+        #idx = fluid.layers.data(
+        #    name='idx', shape=idx_shape, dtype=idx_type, append_batch_size=False)
+        #y = pointnet_lib.group_points(x, idx)
         place = fluid.CUDAPlace(0)
-        exe = fluid.Executor(place)
-        outs = exe.run(feed={'x': x_np, 'idx': idx_np}, fetch_list=[y])
-
-        self.assertTrue(np.allclose(outs[0], out_np))
+        with fluid.dygraph.guard(place):
+            x_np = np.random.uniform(-10, 10, x_shape).astype(x_type)
+            x_np = np.zeros(x_shape).astype(x_type)
+            print(x_np)
+            idx_np = np.random.randint(0, x_shape[1], idx_shape).astype(idx_type)
+            out_np = group_points_np(x_np, idx_np)
+            x = to_variable(x_np)
+            idx = to_variable(idx_np)
+            outs = pointnet_lib.group_points(x, idx)
+            y = outs.numpy()
+        self.assertTrue(np.allclose(y, out_np))
 
 
 if __name__ == "__main__":

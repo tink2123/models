@@ -11,21 +11,3 @@
 #WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 #See the License for the specific language governing permissions and
 #limitations under the License.
-
-from __future__ import absolute_import
-
-from . import pointnet2_modules
-from . import pointnet2_seg
-from . import pointnet2_cls
-
-from .pointnet2_modules import *
-from .pointnet2_seg import *
-from .pointnet2_cls import *
-from .pointnet2_modules_dy import *
-from .pointnet2_cls_msg_dy import *
-
-__all__ = pointnet2_modules.__all__
-__all__ += pointnet2_seg.__all__
-__all__ += pointnet2_cls.__all__
-__all__ += pointnet2_cls_msg_dy.__all__
-__all__ += pointnet2_modules_dy.__all__

@@ -25,7 +25,7 @@ import paddle.fluid as fluid
 from paddle.fluid.param_attr import ParamAttr
 from paddle.fluid.initializer import Constant
 from .pointnet2_modules import *
-
+#from pointnet2_modules import *
 __all__ = ["PointNet2ClsSSG", "PointNet2ClsMSG"]
 
 
@@ -44,17 +44,18 @@ class PointNet2Cls(object):
     def build_input(self):
         self.xyz = fluid.layers.data(name='xyz', shape=[self.num_points, 3], dtype='float32', lod_level=0)
         self.label = fluid.layers.data(name='label', shape=[1], dtype='int64', lod_level=0)
-        self.pyreader = fluid.io.PyReader(
-                feed_list=[self.xyz, self.label],
-                capacity=64,
-                use_double_buffer=True,
-                iterable=False)
-        self.feed_vars = [self.xyz, self.label]
+        #self.pyreader = fluid.io.PyReader(
+        #        feed_list=[self.xyz, self.label],
+        #        capacity=64,
+        #        use_double_buffer=True,
+        #        iterable=False)
+        #self.feed_vars = [self.xyz, self.label]
 
     def build_model(self, bn_momentum=0.99):
         self.build_input()
 
         xyz, feature = self.xyz, None
+        #print("feature:",feature)
         for i, SA_conf in enumerate(self.SA_confs):
             xyz, feature = pointnet_sa_module(
                     xyz=xyz,
@@ -63,22 +64,30 @@ class PointNet2Cls(object):
                     use_xyz=self.use_xyz,
                     name="sa_{}".format(i),
                     **SA_conf)
-	out = fluid.layers.transpose(feature, perm=[0, 2, 1])
+        out = fluid.layers.transpose(feature, perm=[0, 2, 1])
         out = fluid.layers.squeeze(out,axes=[-1])
-
+        #print("after sa module:",out.shape)
 	out = fc_bn(out,out_channels=512, bn=True, bn_momentum=bn_momentum, name="fc_1")
         out = fluid.layers.dropout(out, 0.5, dropout_implementation="upscale_in_train")
         out = fc_bn(out,out_channels=256, bn=True, bn_momentum=bn_momentum, name="fc_2")
         out = fluid.layers.dropout(out, 0.5, dropout_implementation="upscale_in_train")
         out = fc_bn(out,out_channels=self.num_classes, act=None, name="fc_3")
-        pred = fluid.layers.softmax(out)
 
-        # calc loss
-        self.loss = fluid.layers.cross_entropy(pred, self.label)
+        out = fluid.layers.softmax(out)
+
+        # calc loss softmax
+        self.loss = fluid.layers.cross_entropy(out, self.label)
         self.loss = fluid.layers.reduce_mean(self.loss)
 
+
+        # sigmoid loss
+	#label_onehot = fluid.layers.one_hot(self.label,depth=self.num_classes)
+	#label_float = fluid.layers.cast(label_onehot,dtype="float32")
+	#self.loss = fluid.layers.sigmoid_cross_entropy_with_logits(out,label_float)
+        #self.loss = fluid.layers.reduce_mean(self.loss)
+
         # calc acc
-        pred = fluid.layers.reshape(pred, shape=[-1, self.num_classes])
+        pred = fluid.layers.reshape(out, shape=[-1, self.num_classes])
         label = fluid.layers.reshape(self.label, shape=[-1, 1])
         self.acc1 = fluid.layers.accuracy(pred, label, k=1)
 
@@ -86,7 +95,8 @@ class PointNet2Cls(object):
         return self.feed_vars
 
     def get_outputs(self):
-        return {"loss": self.loss, "accuracy": self.acc1}
+        return self.loss, self.acc1
+        #return {"loss": self.loss, "accuracy": self.acc1}
 
     def get_pyreader(self):
         return self.pyreader
@@ -149,4 +159,36 @@ class PointNet2ClsMSG(PointNet2Cls):
             },
         ]
 
+if __name__ == "__main__":
+    num_classes = 13
+    num_points = 32
+    seed = 1333
+    model = PointNet2ClsMSG(num_classes,num_points)
+    model.build_model()
+    loss,acc = model.get_outputs()
+    opt = fluid.optimizer.AdamOptimizer(learning_rate=3e-2)
+    #opt = fluid.optimizer.SGD(learning_rate=3e-2)
+    opt.minimize(loss)
 
+    place = fluid.CUDAPlace(0)
+    exe = fluid.Executor(place)
+    fluid.default_startup_program().random_seed = seed
+    fluid.default_main_program().random_seed = seed
+    exe.run(fluid.default_startup_program())
+    # print param.name
+    #for i,var in enumerate(fluid.default_startup_program().list_vars()):
+    #    print(i,var.name)
+
+    np.random.seed(1333)
+    xyz_np = np.random.uniform(-100, 100, (8, 32, 3)).astype('float32')
+    #feature_np = np.random.uniform(-100, 100, (8, 32, 6)).astype('float32')
+    label_np = np.random.uniform(0, num_classes, (8, 1)).astype('int64')
+    #print("xyz", xyz_np)
+    #print("feaure", feature_np)
+    print("label", label_np)
+    for i in range(10):
+        ret = exe.run(fetch_list=[loss.name], feed={'xyz': xyz_np,'label': label_np})
+        #print("batch_norm_22.w_0:",ret[0])
+        #print("fc weight:",ret[1])
+        print("loss:",ret[-1])
+        #print("output:",np.sum(ret[0]))
