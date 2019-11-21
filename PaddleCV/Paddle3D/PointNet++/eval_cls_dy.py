@@ -127,26 +127,6 @@ def parse_args():
     args = parser.parse_args()
     return args
 
-
-"""
-def exponential_with_clip(learning_rate, decay_steps, decay_rate,
-                                  min_lr):
-    global_step = lr_scheduler._decay_step_counter()
-
-    lr = fluid.layers.create_global_var(
-        shape=[1],
-        value=float(lr),
-        dtype='float32',
-        persistable=False,
-        name="learning_rate")
-
-    decayed_lr = learning_rate * (decay_rate ** int(global_step / decay_steps))
-    decayed_lr = max(decayed_lr, min_lr)
-    fluid.layers.assign(decayed_lr, lr)
-
-    return lr
-"""
-
 def test():
     args = parse_args()
     with fluid.dygraph.guard():

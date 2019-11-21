@@ -150,39 +150,7 @@ class PointNet2ClsSSG_dy(fluid.dygraph.Layer):
 if __name__ == "__main__":
     num_classes = 13
     num_points = 32
-    """
-    pointnet_cls = PointNet2ClsMSG_dy("pointnet2_cls",num_classes=13, num_points=32)
-    
-    xyz = fluid.layers.data(name='xyz', shape=[32, 3], dtype='float32', lod_level=0)
-    #feature = fluid.layers.data(name='feature', shape=[32, 6], dtype='float32', lod_level=0)
-    label = fluid.layers.data(name='label', shape=[1], dtype='int64', lod_level=0)
-    
-    out,loss,_= pointnet_cls(xyz,label)
-    opt = fluid.optimizer.AdamOptimizer(learning_rate=3e-2)
-    opt.minimize(loss)
 
-
-    place = fluid.CUDAPlace(0)
-    exe = fluid.Executor(place)
-    exe.run(fluid.default_startup_program())
-
-    np.random.seed(1333)
-    xyz_np = np.random.uniform(-100, 100, (8, 32, 3)).astype('float32')
-    #feature_np = np.random.uniform(-100, 100, (8, 32, 6)).astype('float32')
-    label_np = np.random.uniform(0, num_classes, (8, 1)).astype('int64')
-    #print("xyz", xyz_np)
-    #print("feaure", feature_np)
-    print("label", label_np)
-    for i,param in enumerate(pointnet_cls.parameters()):
-        pass
-        #print (i,param.name)
-    for i in range(5):
-        ret = exe.run(fetch_list=[out.name,loss.name], feed={'xyz': xyz_np, 'label': label_np})
-	print("loss:",np.array(ret[-1]))
-	#print("pred:",ret[-2])
-	#print("grad",ret[0])
-    """
-    #place = fluid.CUDAPlace(0)
     with fluid.dygraph.guard():
         pointnet_cls = PointNet2ClsMSG_dy("pointnet2_cls",num_classes=13, num_points=32)
         np.random.seed(1333)

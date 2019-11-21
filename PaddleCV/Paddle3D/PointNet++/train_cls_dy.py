@@ -61,8 +61,8 @@ def parse_args():
     parser.add_argument(
         '--num_points',
         type=int,
-        default=4096,
-        help='number of points in a sample, default: 4096')
+        default=2048,
+        help='number of points in a sample, default: 2048')
     parser.add_argument(
         '--num_classes',
         type=int,
@@ -166,18 +166,6 @@ def train():
         #lr = fluid.layers.clip(lr, 1e-5, args.lr)
         optimizer = fluid.optimizer.AdamOptimizer(learning_rate=lr,
                 regularization=fluid.regularizer.L2Decay(args.weight_decay))
-
-        # def _train_reader():
-        #     def reader():
-        #         np.random.seed(2333)
-        #         xyz = np.random.random((4096, 3)).astype('float32')
-        #         feature = np.random.random((4096, 6)).astype('float32')
-        #         label = np.random.uniform(0, 13, (4096, 1)).astype('int64')
-        #         for i in range(10):
-        #             yield [(xyz, feature, label), (xyz, feature, label)]
-        #     return reader
-        # train_reader = _train_reader()
-        # test_reader = _train_reader()
     
         # get reader
         trans_list = [
@@ -214,10 +202,7 @@ def train():
                     bn_momentum = max(bn_momentum, 1e-2)
                 global_step += 1
 
-                #print(np.array(data[0][0]).shape)
-                #print(np.array(data[0][1]).shape) 
                 xyz_data = np.array([x[0].reshape(args.num_points, 3) for x in data]).astype('float32')
-                # feature_data = np.array([x[1].reshape(self.num_points, 6) for x in data]).astype('float32')
                 label_data = np.array([x[1].reshape(1) for x in data]).astype('int64')
 
                 xyz = to_variable(xyz_data)
