@@ -23,8 +23,8 @@ from paddle.fluid.regularizer import L2Decay
 
 from config import cfg
 
-from .darknet import add_DarkNet53_conv_body
-from .darknet import conv_bn_layer
+from darknet import add_DarkNet53_conv_body
+from darknet import conv_bn_layer
 
 
 def yolo_detection_block(input, channel, is_test=True, name=None):
@@ -83,7 +83,7 @@ def upsample(input, scale=2, name=None):
 
 
 class YOLOv3(object):
-    def __init__(self, is_train=True, use_random=True):
+    def __init__(self, is_train=True, use_random=False):
         self.is_train = is_train
         self.use_random = use_random
         self.outputs = []
@@ -116,7 +116,24 @@ class YOLOv3(object):
         return [self.image, self.gtbox, self.gtlabel, self.gtscore]
 
     def build_model(self):
-        self.build_input()
+        #self.build_input()
+        self.image_shape = [3, 256, 256]
+        self.gt_box_shape = [-1,1,4]
+        self.image = fluid.layers.data(
+                name='xyz', shape=self.image_shape, dtype='float32')
+        self.gtbox = fluid.layers.data(
+            name="gt_box", shape=self.gt_box_shape, dtype="float32"
+        )
+        self.gtlabel = fluid.layers.data(
+            name="gt_label", shape=[-1, 1], dtype="int64")
+        self.gtscore = fluid.layers.data(
+            name="gt_score", shape=[-1, 1], dtype="float32"
+        )
+
+        #self.im_shape = fluid.layers.data(
+        #    name="im_shape", shape=[2], dtype='int32')
+        #self.im_shape = fluid.layers.data(
+        #    name="im_shape", shape=[2], dtype='int32')
 
         self.outputs = []
         self.boxes = []
@@ -176,7 +193,7 @@ class YOLOv3(object):
                     class_num=cfg.class_num,
                     ignore_thresh=cfg.ignore_thresh,
                     downsample_ratio=self.downsample,
-                    use_label_smooth=bool(cfg.label_smooth),
+                    use_label_smooth=False,
                     name="yolo_loss" + str(i))
                 self.losses.append(fluid.layers.reduce_mean(loss))
             else:
