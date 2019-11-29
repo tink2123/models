@@ -238,123 +238,117 @@ class Yolov3(fluid.dygraph.Layer):
             return sum(self.losses)
 
 
+
+
 if __name__ == "__main__":
     import numpy as np
-    import darknet
+    import unittest
+    import functools
     import yolov3
     import unittest
-    import argparse
     from config import cfg
 
     import paddle.fluid as fluid
-
-    if __name__ == "__main__":
-        import numpy as np
-        import unittest
-        import functools
-        from config import cfg
-
-        import paddle.fluid as fluid
-        from test_imperative_base import new_program_scope
+    from test_imperative_base import new_program_scope
 
 
-        class TestDygraphGAN(unittest.TestCase):
-            def test(self):
-                startup = fluid.Program()
-                startup.random_seed = 10
-                main = fluid.Program()
-                main.random_seed = 10
-                scope = fluid.core.Scope()
+    class TestDygraphGAN(unittest.TestCase):
+        def test(self):
+            startup = fluid.Program()
+            startup.random_seed = 10
+            main = fluid.Program()
+            main.random_seed = 10
+            scope = fluid.core.Scope()
 
-                np.random.seed(1333)
-                xyz_np = np.random.random((1, 3, 256, 256)).astype('float32')
-                gtbox_np = np.array([[[0.5, 0.6, 0.3, 0.8], [0.4, 0.9, 0.2, 0.7]]]).astype('float32')
-                gtlabel_np = np.array([[1, 2]]).astype('int32')
-                gtscore_np = np.array([[0.4, 0.5]]).astype('float32')
+            np.random.seed(1333)
+            xyz_np = np.random.random((1, 3, 256, 256)).astype('float32')
+            gtbox_np = np.array([[[0.5, 0.6, 0.3, 0.8], [0.4, 0.9, 0.2, 0.7]]]).astype('float32')
+            gtlabel_np = np.array([[1, 2]]).astype('int32')
+            gtscore_np = np.array([[0.4, 0.5]]).astype('float32')
 
 
-                with fluid.dygraph.guard(fluid.CPUPlace()):
-                    fluid.default_startup_program().random_seed = 10
-                    fluid.default_main_program().random_seed = 10
+            with fluid.dygraph.guard(fluid.CPUPlace()):
+                fluid.default_startup_program().random_seed = 10
+                fluid.default_main_program().random_seed = 10
 
-                    model = Yolov3("yolov3")
-                    opt = fluid.optimizer.SGD(learning_rate=0.001)
-                    #for param in model.parameters():
+                model = Yolov3("yolov3")
+                opt = fluid.optimizer.SGD(learning_rate=0.001)
+                #for param in model.parameters():
+                    #print(param.name)
+                    #dy_param_init_value[param.name] = param.numpy()
+
+                data = to_variable(xyz_np)
+                gtbox = to_variable(gtbox_np)
+
+                gtlabel = to_variable(gtlabel_np)
+                gtlabel.stop_gradient = True
+
+                gtscore = to_variable(gtscore_np)
+                gtscore.stop_gradient = True
+
+                dy_param_gradient = []
+                for i in range(5):
+                    loss = model(data, gtbox, gtlabel, gtscore)
+                    #loss = out["loss"]
+                    loss.backward()
+
+                    dy_gradient=[]
+                    dy_param_name = []
+                    for param in model.parameters():
                         #print(param.name)
-                        #dy_param_init_value[param.name] = param.numpy()
-
-                    data = to_variable(xyz_np)
-                    gtbox = to_variable(gtbox_np)
-
-                    gtlabel = to_variable(gtlabel_np)
-                    gtlabel.stop_gradient = True
-
-                    gtscore = to_variable(gtscore_np)
-                    gtscore.stop_gradient = True
-
-                    dy_param_gradient = []
-                    for i in range(5):
-                        loss = model(data, gtbox, gtlabel, gtscore)
-                        #loss = out["loss"]
-                        loss.backward()
-
-                        dy_gradient=[]
-                        dy_param_name = []
-                        for param in model.parameters():
-                            #print(param.name)
-                            #if param.name == "yolov3/Yolov3_0/DarkNet53_conv_body_0/ConvBNLayer_0/Conv2D_0.w_0":
-                            if param.name.endswith("w_1") or param.name.endswith("w_2"):
-                                pass
-                            else:
-                                dy_gradient.append(param.numpy())
-                                dy_param_name.append(param.name)
-                        print("dy loss:", loss.numpy())
-
-                        opt.minimize(loss)
-
-                        model.clear_gradients()
-
-                with fluid.scope_guard(scope):
-                    fluid.default_startup_program().random_seed = 10
-                    fluid.default_main_program().random_seed = 10
-
-                    model = yolov3.YOLOv3()
-                    model.build_model()
-                    # out is correct
-                    out = model.outputs
-                    loss = model.loss()
+                        #if param.name == "yolov3/Yolov3_0/DarkNet53_conv_body_0/ConvBNLayer_0/Conv2D_0.w_0":
+                        if param.name.endswith("w_1") or param.name.endswith("w_2"):
+                            pass
+                        else:
+                            dy_gradient.append(param.numpy())
+                            dy_param_name.append(param.name)
+                    print("dy loss:", loss.numpy())
 
                     opt.minimize(loss)
 
-                    place = fluid.CPUPlace()
-                    exe = fluid.Executor(place)
-                    exe.run(fluid.default_startup_program())
-                    st_param = []
-                    for param in fluid.default_main_program().global_block().all_parameters():
-                        st_param.append(param.name)
-                    print("len st param:", len(st_param))
+                    model.clear_gradients()
 
-                    fetch_param = []
-                    for grad in st_param:
-                        if grad.endswith("var") or grad.endswith("mean"):
-                            pass
-                        else:
-                            #fetch_param.append(str(grad)+"@GRAD")
-                            fetch_param.append(str(grad))
+            with fluid.scope_guard(scope):
+                fluid.default_startup_program().random_seed = 10
+                fluid.default_main_program().random_seed = 10
+
+                model = yolov3.YOLOv3()
+                model.build_model()
+                # out is correct
+                out = model.outputs
+                loss = model.loss()
+
+                opt.minimize(loss)
+
+                place = fluid.CPUPlace()
+                exe = fluid.Executor(place)
+                exe.run(fluid.default_startup_program())
+                st_param = []
+                for param in fluid.default_main_program().global_block().all_parameters():
+                    st_param.append(param.name)
+                print("len st param:", len(st_param))
+
+                fetch_param = []
+                for grad in st_param:
+                    if grad.endswith("var") or grad.endswith("mean"):
+                        pass
+                    else:
+                        #fetch_param.append(str(grad)+"@GRAD")
+                        fetch_param.append(str(grad))
 
 
-                    for i in range(5):
-                        ret = exe.run(fetch_list= [loss.name], feed={'xyz': xyz_np,
-                                                                                          'gt_box': gtbox_np,
-                                                                                          'gt_label': gtlabel_np,
-                                                                                          'gt_score': gtscore_np})
+                for i in range(5):
+                    ret = exe.run(fetch_list= [loss.name], feed={'xyz': xyz_np,
+                                                                                      'gt_box': gtbox_np,
+                                                                                      'gt_label': gtlabel_np,
+                                                                                      'gt_score': gtscore_np})
 
-                        loss_data = ret[-1]
+                    loss_data = ret[-1]
 
-                        print("loss data:", loss_data)
+                    print("loss data:", loss_data)
 
-                print("st loss:",loss_data)
+            print("st loss:",loss_data)
 
 
-        unittest.main()
+    unittest.main()
 
