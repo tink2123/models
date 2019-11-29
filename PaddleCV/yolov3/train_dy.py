@@ -135,12 +135,30 @@ def train():
             """
             data = next(train_reader())
 
-            img, gt_box, gt_label, gt_score = data[0], data[1], data[2], data[3]
+            #print(len(data[0]))
+            #print(data)
+            #img, gt_box, gt_label, gt_score = data[0], data[1], data[2], data[3]
+            #img = np.array([data[0].reshape(3,608,608)]).astype('float32')
+            #img = to_variable(img)
+            #gt_box = np.array([data[1]]).astype('float32')
+            #gt_box = to_variable(gt_box)
+            #gt_label = np.array([data[2]]).astype('int32')
+            #gt_label = to_variable(gt_label)
+            #gt_score = np.array([data[3]]).astype('float32')
+            #gt_score = to_variable(gt_score)
 
+            img = np.array([x[0] for x in data]).astype('float32')
             img = to_variable(img)
+            
+            gt_box = np.array([x[1] for x in data]).astype('float32')
             gt_box = to_variable(gt_box)
+            
+            gt_label = np.array([x[2] for x in data]).astype('int32')
             gt_label = to_variable(gt_label)
+
+            gt_score = np.array([x[3] for x in data]).astype('float32')
             gt_score = to_variable(gt_score)
+
 
             loss = model(img, gt_box, gt_label, gt_score)
             snapshot_loss += loss.numpy()
@@ -156,9 +174,8 @@ def train():
             optimizer.minimize(loss)
             model.clear_gradients()
 
-            #if iter_id > 1 and iter_id % cfg.snapshot_iter == 0:
-            if iter_id > 1 and iter_id % 10 == 0:
-                fluid.save_dygraph(model.state_dict(),args.model_sva_dir+"/{}".format(iter_id))
+            if iter_id > 1 and iter_id % cfg.snapshot_iter == 0:
+                fluid.save_dygraph(model.state_dict(),args.model_save_dir+"/yolove_{}".format(iter_id))
 
 
 
