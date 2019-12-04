@@ -160,7 +160,7 @@ class Yolov3(fluid.dygraph.Layer):
                 self.route_blocks_2.append(route)
             self.upsample = Upsample(self.full_name())
 
-    def forward(self, inputs, gtbox, gtlabel, gtscore ):
+    def forward(self, inputs, gtbox=None, gtlabel=None, gtscore=None, im_id=None, im_shape=None ):
         self.outputs = []
         self.boxes = []
         self.scores = []
@@ -181,6 +181,8 @@ class Yolov3(fluid.dygraph.Layer):
         self.gtbox = gtbox
         self.gtlabel = gtlabel
         self.gtscore = gtscore
+        self.im_id = im_id
+        self.im_shape = im_shape
 
         # cal loss
         for i,out in enumerate(self.outputs):

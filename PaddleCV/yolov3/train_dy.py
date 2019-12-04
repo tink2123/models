@@ -160,7 +160,7 @@ def train():
             gt_score = to_variable(gt_score)
 
 
-            loss = model(img, gt_box, gt_label, gt_score)
+            loss = model(img, gt_box, gt_label, gt_score, None, None)
             snapshot_loss += loss.numpy()
             snapshot_time += start_time - prev_start_time
             total_sample += 1
