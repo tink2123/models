@@ -116,19 +116,19 @@ class YOLOv3(object):
         return [self.image, self.gtbox, self.gtlabel, self.gtscore]
 
     def build_model(self):
-        #self.build_input()
-        self.image_shape = [3, 256, 256]
-        self.gt_box_shape = [-1,1,4]
-        self.image = fluid.layers.data(
-                name='xyz', shape=self.image_shape, dtype='float32')
-        self.gtbox = fluid.layers.data(
-            name="gt_box", shape=self.gt_box_shape, dtype="float32"
-        )
-        self.gtlabel = fluid.layers.data(
-            name="gt_label", shape=[-1, 1], dtype="int64")
-        self.gtscore = fluid.layers.data(
-            name="gt_score", shape=[-1, 1], dtype="float32"
-        )
+        self.build_input()
+        #self.image_shape = [3, 256, 256]
+        #self.gt_box_shape = [-1,1,4]
+        #self.image = fluid.layers.data(
+        #        name='xyz', shape=self.image_shape, dtype='float32')
+        #self.gtbox = fluid.layers.data(
+        #    name="gt_box", shape=self.gt_box_shape, dtype="float32"
+        #)
+        #self.gtlabel = fluid.layers.data(
+        #    name="gt_label", shape=[-1, 1], dtype="int64")
+        #self.gtscore = fluid.layers.data(
+        #    name="gt_score", shape=[-1, 1], dtype="float32"
+        #)
 
         #self.im_shape = fluid.layers.data(
         #    name="im_shape", shape=[2], dtype='int32')
@@ -193,7 +193,7 @@ class YOLOv3(object):
                     class_num=cfg.class_num,
                     ignore_thresh=cfg.ignore_thresh,
                     downsample_ratio=self.downsample,
-                    use_label_smooth=False,
+                    use_label_smooth=cfg.label_smooth,
                     name="yolo_loss" + str(i))
                 self.losses.append(fluid.layers.reduce_mean(loss))
             else:

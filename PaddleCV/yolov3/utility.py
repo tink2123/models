@@ -22,6 +22,7 @@ import sys
 import distutils.util
 import numpy as np
 import six
+import ast
 from collections import deque
 import paddle.fluid as fluid
 import argparse
@@ -122,6 +123,7 @@ def parse_args():
     add_arg('start_iter',       int,    0,      "Start iteration.")
     add_arg('use_multiprocess_reader', bool,   True,   "whether use multiprocess reader.")
     add_arg('worker_num',       int,   8,   "worker number for multiprocess reader.")
+    add_arg('use_data_parallel', ast.literal_eval, False, "the flag indicating whether to use data parallel model to train the model")
     #SOLVER
     add_arg('batch_size',       int,    8,      "Mini-batch size per device.")
     add_arg('learning_rate',    float,  0.001,  "Learning rate.")
