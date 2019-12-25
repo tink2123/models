@@ -1,16 +1,16 @@
 #  Copyright (c) 2019 PaddlePaddle Authors. All Rights Reserve.
 #
-#Licensed under the Apache License, Version 2.0 (the "License");
-#you may not use this file except in compliance with the License.
-#You may obtain a copy of the License at
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
 #
 #    http://www.apache.org/licenses/LICENSE-2.0
 #
-#Unless required by applicable law or agreed to in writing, software
-#distributed under the License is distributed on an "AS IS" BASIS,
-#WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-#See the License for the specific language governing permissions and
-#limitations under the License.
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
 
 from __future__ import absolute_import
 from __future__ import division
@@ -47,8 +47,8 @@ from config import cfg
 import dist_utils
 from paddle.fluid.dygraph.base import to_variable
 
-
 num_trainers = int(os.environ.get('PADDLE_TRAINERS_NUM', 1))
+
 
 def get_device_num():
     # NOTE(zcd): for multi-processe training, each process use one GPU card.
@@ -58,7 +58,6 @@ def get_device_num():
 
 
 def train():
-
     # check if set use_gpu=True in paddlepaddle cpu version
     check_gpu(cfg.use_gpu)
 
@@ -75,17 +74,26 @@ def train():
         os.makedirs(cfg.model_save_dir)
 
     gpu_id = int(os.environ.get('FLAGS_selected_gpus', 0))
-    place = fluid.CUDAPlace(gpu_id) if cfg.use_gpu else fluid.CPUPlace()
+    place = fluid.CUDAPlace(fluid.dygraph.parallel.Env().dev_id) if cfg.use_data_parallel else fluid.CUDAPlace(0)
 
     with fluid.dygraph.guard(place):
+        model = Yolov3("yolov3", 3, is_train=True)
+        if args.use_data_parallel:
+            strategy = fluid.dygraph.parallel.prepare_context()
+            model = fluid.dygraph.parallel.DataParallel(model, strategy)
 
-        model = Yolov3("yolov3",is_train=True)
-
-        learning_rate = cfg.learning_rate
+        if cfg.pretrain:
+            a = np.load("weights/final_pretrain.npz")
+            state_dict = model.state_dict()
+            for k,v in a.items():
+                state_dict[k]=a[k]
         boundaries = cfg.lr_steps
         gamma = cfg.lr_gamma
         step_num = len(cfg.lr_steps)
+        learning_rate = cfg.learning_rate
         values = [learning_rate * (gamma ** i) for i in range(step_num + 1)]
+
+        """
 
         lr = fluid.layers.piecewise_decay(
             boundaries=boundaries,
@@ -95,7 +103,30 @@ def train():
             learning_rate=lr,
             regularization=fluid.regularizer.L2Decay(cfg.weight_decay),
             momentum=cfg.momentum)
+        """
+        lr = fluid.layers.piecewise_decay(
+            boundaries=boundaries,
+            values=values)
+        """
+        lr = fluid.dygraph.NoamDecay(
+               1/(cfg.warm_up_iter *(learning_rate ** 2)),
+               cfg.warm_up_iter)
+        """    
+        lr = fluid.layers.linear_lr_warmup(
+                learning_rate=lr,
+                warmup_steps=cfg.warm_up_iter,
+                start_lr=0.0,
+                end_lr=cfg.learning_rate)
 
+        optimizer = fluid.optimizer.Momentum(
+            #learning_rate=fluid.layers.linear_lr_warmup(
+            #                 learning_rate=cfg.learning_rate,
+            #                 warmup_steps=cfg.warm_up_iter,
+            #                 start_lr=0.0,
+            #                 end_lr=cfg.learning_rate),
+            learning_rate=lr,
+            regularization=fluid.regularizer.L2Decay(cfg.weight_decay),
+            momentum=cfg.momentum)
 
         start_time = time.time()
         snapshot_loss = 0
@@ -109,7 +140,8 @@ def train():
         mixup_iter = total_iter - cfg.no_mixup_iter
 
         random_sizes = [cfg.input_size]
-
+        if cfg.random_shape:
+            random_sizes = [32 * i for i in range(10,20)]
 
         train_reader = reader.train(
             input_size,
@@ -122,7 +154,12 @@ def train():
             use_multiprocess_reader=cfg.use_multiprocess_reader,
             num_workers=cfg.worker_num)
 
-        for iter_id in range(cfg.start_iter, cfg.max_iter):
+        if args.use_data_parallel:
+            train_reader = fluid.contrib.reader.distributed_batch_reader(train_reader)
+        smoothed_loss = SmoothedValue()
+
+        #for iter_id in range(cfg.start_iter, cfg.max_iter):
+        for iter_id, data in enumerate(train_reader()):
             prev_start_time = start_time
             start_time = time.time()
 
@@ -133,51 +170,58 @@ def train():
             gt_label = next()
             gt_score = next()
             """
-            data = next(train_reader())
+            #data = next(train_reader())
 
-            #print(len(data[0]))
-            #print(data)
-            #img, gt_box, gt_label, gt_score = data[0], data[1], data[2], data[3]
-            #img = np.array([data[0].reshape(3,608,608)]).astype('float32')
-            #img = to_variable(img)
-            #gt_box = np.array([data[1]]).astype('float32')
-            #gt_box = to_variable(gt_box)
-            #gt_label = np.array([data[2]]).astype('int32')
-            #gt_label = to_variable(gt_label)
-            #gt_score = np.array([data[3]]).astype('float32')
-            #gt_score = to_variable(gt_score)
+            # print(len(data[0]))
+            # print(data)
+            # img, gt_box, gt_label, gt_score = data[0], data[1], data[2], data[3]
+            # img = np.array([data[0].reshape(3,608,608)]).astype('float32')
+            # img = to_variable(img)
+            # gt_box = np.array([data[1]]).astype('float32')
+            # gt_box = to_variable(gt_box)
+            # gt_label = np.array([data[2]]).astype('int32')
+            # gt_label = to_variable(gt_label)
+            # gt_score = np.array([data[3]]).astype('float32')
+            # gt_score = to_variable(gt_score)
 
             img = np.array([x[0] for x in data]).astype('float32')
             img = to_variable(img)
-            
+
             gt_box = np.array([x[1] for x in data]).astype('float32')
             gt_box = to_variable(gt_box)
-            
+
             gt_label = np.array([x[2] for x in data]).astype('int32')
             gt_label = to_variable(gt_label)
 
             gt_score = np.array([x[3] for x in data]).astype('float32')
             gt_score = to_variable(gt_score)
 
-
             loss = model(img, gt_box, gt_label, gt_score, None, None)
+            smoothed_loss.add_value(np.mean(loss.numpy()))
             snapshot_loss += loss.numpy()
             snapshot_time += start_time - prev_start_time
             total_sample += 1
 
+
+            #print("lr:",lr()[0].numpy())
             print("Iter {:d}, loss {:.6f}".format(
                 iter_id,
-                float(snapshot_loss/total_sample)))
+                smoothed_loss.get_mean_value()))
 
+            if args.use_data_parallel:
+                loss = model.scale_loss(loss)
+                loss.backward()
+                model.apply_collective_grads()
             loss.backward()
 
             optimizer.minimize(loss)
             model.clear_gradients()
 
-            if iter_id > 1 and iter_id % cfg.snapshot_iter == 0:
-                fluid.save_dygraph(model.state_dict(),args.model_save_dir+"/yolove_{}".format(iter_id))
-
-
+            save_parameters = (not args.use_data_parallel) or (
+                args.use_data_parallel and
+                    fluid.dygraph.parallel.Env().local_rank == 0)
+            if save_parameters and iter_id > 1 and iter_id % cfg.snapshot_iter == 0:
+                fluid.save_dygraph(model.state_dict(), args.model_save_dir + "/yolov3_{}".format(iter_id))
 
 
 if __name__ == '__main__':

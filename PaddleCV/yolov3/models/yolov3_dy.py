@@ -30,14 +30,14 @@ from darknet_dy import ConvBNLayer
 from paddle.fluid.dygraph.base import to_variable
 
 class YoloDetectionBlock(fluid.dygraph.Layer):
-    def __init__(self,name_scope,channel,is_test=True):
-        super(YoloDetectionBlock, self).__init__(name_scope)
+    def __init__(self,ch_in,channel,is_test=True):
+        super(YoloDetectionBlock, self).__init__()
 
         assert channel % 2 == 0, \
             "channel {} cannot be divided by 2".format(channel)
 
         self.conv0 = ConvBNLayer(
-            self.full_name(),
+            ch_in=ch_in,
             ch_out=channel,
             filter_size=1,
             stride=1,
@@ -45,7 +45,7 @@ class YoloDetectionBlock(fluid.dygraph.Layer):
             is_test=is_test
             )
         self.conv1 = ConvBNLayer(
-            self.full_name(),
+            ch_in=channel,
             ch_out=channel*2,
             filter_size=3,
             stride=1,
@@ -53,7 +53,7 @@ class YoloDetectionBlock(fluid.dygraph.Layer):
             is_test=is_test
             )
         self.conv2 = ConvBNLayer(
-            self.full_name(),
+            ch_in=channel*2,
             ch_out=channel,
             filter_size=1,
             stride=1,
@@ -61,7 +61,7 @@ class YoloDetectionBlock(fluid.dygraph.Layer):
             is_test=is_test
             )
         self.conv3 = ConvBNLayer(
-            self.full_name(),
+            ch_in=channel,
             ch_out=channel*2,
             filter_size=3,
             stride=1,
@@ -69,7 +69,7 @@ class YoloDetectionBlock(fluid.dygraph.Layer):
             is_test=is_test
             )
         self.route = ConvBNLayer(
-            self.full_name(),
+            ch_in=channel*2,
             ch_out=channel,
             filter_size=1,
             stride=1,
@@ -77,7 +77,7 @@ class YoloDetectionBlock(fluid.dygraph.Layer):
             is_test=is_test
             )
         self.tip = ConvBNLayer(
-            self.full_name(),
+            ch_in=channel,
             ch_out=channel*2,
             filter_size=3,
             stride=1,
@@ -95,8 +95,8 @@ class YoloDetectionBlock(fluid.dygraph.Layer):
 
 
 class Upsample(fluid.dygraph.Layer):
-    def __init__(self,name_scope,scale=2):
-        super(Upsample,self).__init__(name_scope)
+    def __init__(self,scale=2):
+        super(Upsample,self).__init__()
         self.scale = scale
 
     def forward(self, inputs):
@@ -114,21 +114,23 @@ class Upsample(fluid.dygraph.Layer):
         return out
 
 class Yolov3(fluid.dygraph.Layer):
-    def __init__(self,name_scope,is_train=True, use_random=False):
+    def __init__(self,name_scope,ch_in,is_train=True, use_random=False):
         super(Yolov3,self).__init__(name_scope)
 
         self.is_train = is_train
         self.use_random = use_random
 
-        self.block = DarkNet53_conv_body(self.full_name(),
+        self.block = DarkNet53_conv_body("darknet53",
+                                         ch_in=ch_in,
                                          is_test = not self.is_train)
         self.block_outputs = []
         self.yolo_blocks = []
         self.route_blocks_2 = []
+        ch_in_list = [1024,768,384]
         for i in range(3):
             yolo_block = self.add_sublayer(
                 "yolo_detecton_block_%d" % (i),
-                YoloDetectionBlock(self.full_name(),
+                YoloDetectionBlock(ch_in_list[i],
                                    channel = 512//(2**i),
                                    is_test = not self.is_train))
             self.yolo_blocks.append(yolo_block)
@@ -137,7 +139,7 @@ class Yolov3(fluid.dygraph.Layer):
 
             block_out = self.add_sublayer(
                 "block_out_%d" % (i),
-                Conv2D(self.full_name(),
+                Conv2D(num_channels=1024//(2**i),
                        num_filters=num_filters,
                        filter_size=1,
                        stride=1,
@@ -151,14 +153,14 @@ class Yolov3(fluid.dygraph.Layer):
             self.block_outputs.append(block_out)
             if i < 2:
                 route = self.add_sublayer("route2_%d"%i,
-                                          ConvBNLayer(self.full_name(),
+                                          ConvBNLayer(ch_in=512//(2**i),
                                                       ch_out=256//(2**i),
                                                       filter_size=1,
                                                       stride=1,
                                                       padding=0,
                                                       is_test=(not self.is_train)))
                 self.route_blocks_2.append(route)
-            self.upsample = Upsample(self.full_name())
+            self.upsample = Upsample()
 
     def forward(self, inputs, gtbox=None, gtlabel=None, gtscore=None, im_id=None, im_shape=None ):
         self.outputs = []
@@ -177,7 +179,6 @@ class Yolov3(fluid.dygraph.Layer):
             if i < 2:
                 route = self.route_blocks_2[i](route)
                 route = self.upsample(route)
-
         self.gtbox = gtbox
         self.gtlabel = gtlabel
         self.gtscore = gtscore
@@ -198,7 +199,7 @@ class Yolov3(fluid.dygraph.Layer):
                     class_num=cfg.class_num,
                     ignore_thresh=cfg.ignore_thresh,
                     downsample_ratio=self.downsample,
-                    use_label_smooth=False)
+                    use_label_smooth=cfg.label_smooth)
                 self.losses.append(fluid.layers.reduce_mean(loss))
 
             else:
@@ -251,7 +252,6 @@ if __name__ == "__main__":
     from config import cfg
 
     import paddle.fluid as fluid
-    from test_imperative_base import new_program_scope
 
 
     class TestDygraphGAN(unittest.TestCase):
@@ -269,47 +269,6 @@ if __name__ == "__main__":
             gtscore_np = np.array([[0.4, 0.5]]).astype('float32')
 
 
-            with fluid.dygraph.guard(fluid.CPUPlace()):
-                fluid.default_startup_program().random_seed = 10
-                fluid.default_main_program().random_seed = 10
-
-                model = Yolov3("yolov3")
-                opt = fluid.optimizer.SGD(learning_rate=0.001)
-                #for param in model.parameters():
-                    #print(param.name)
-                    #dy_param_init_value[param.name] = param.numpy()
-
-                data = to_variable(xyz_np)
-                gtbox = to_variable(gtbox_np)
-
-                gtlabel = to_variable(gtlabel_np)
-                gtlabel.stop_gradient = True
-
-                gtscore = to_variable(gtscore_np)
-                gtscore.stop_gradient = True
-
-                dy_param_gradient = []
-                for i in range(5):
-                    loss = model(data, gtbox, gtlabel, gtscore)
-                    #loss = out["loss"]
-                    loss.backward()
-
-                    dy_gradient=[]
-                    dy_param_name = []
-                    for param in model.parameters():
-                        #print(param.name)
-                        #if param.name == "yolov3/Yolov3_0/DarkNet53_conv_body_0/ConvBNLayer_0/Conv2D_0.w_0":
-                        if param.name.endswith("w_1") or param.name.endswith("w_2"):
-                            pass
-                        else:
-                            dy_gradient.append(param.numpy())
-                            dy_param_name.append(param.name)
-                    print("dy loss:", loss.numpy())
-
-                    opt.minimize(loss)
-
-                    model.clear_gradients()
-
             with fluid.scope_guard(scope):
                 fluid.default_startup_program().random_seed = 10
                 fluid.default_main_program().random_seed = 10
@@ -320,6 +279,7 @@ if __name__ == "__main__":
                 out = model.outputs
                 loss = model.loss()
 
+                opt = fluid.optimizer.SGD(learning_rate=0.001)
                 opt.minimize(loss)
 
                 place = fluid.CPUPlace()
@@ -327,6 +287,7 @@ if __name__ == "__main__":
                 exe.run(fluid.default_startup_program())
                 st_param = []
                 for param in fluid.default_main_program().global_block().all_parameters():
+                    #print(param.name)
                     st_param.append(param.name)
                 print("len st param:", len(st_param))
 
@@ -339,7 +300,7 @@ if __name__ == "__main__":
                         fetch_param.append(str(grad))
 
 
-                for i in range(5):
+                for i in range(1):
                     ret = exe.run(fetch_list= [loss.name], feed={'xyz': xyz_np,
                                                                                       'gt_box': gtbox_np,
                                                                                       'gt_label': gtlabel_np,
@@ -349,8 +310,51 @@ if __name__ == "__main__":
 
                     print("loss data:", loss_data)
 
+
+            with fluid.dygraph.guard(fluid.CPUPlace()):
+                fluid.default_startup_program().random_seed = 10
+                fluid.default_main_program().random_seed = 10
+
+                model = Yolov3("yolov3",3)
+                #opt = fluid.optimizer.SGD(learning_rate=0.001)
+                for param in model.parameters():
+                    print(param.name)
+                    #dy_param_init_value[param.name] = param.numpy()
+
+                data = to_variable(xyz_np)
+                gtbox = to_variable(gtbox_np)
+
+                gtlabel = to_variable(gtlabel_np)
+                gtlabel.stop_gradient = True
+
+                gtscore = to_variable(gtscore_np)
+                gtscore.stop_gradient = True
+
+                dy_param_gradient = []
+                for i in range(3):
+                    loss = model(data, gtbox, gtlabel, gtscore)
+                    #loss = out["loss"]
+                    loss.backward()
+
+                    dy_gradient=[]
+                    dy_param_name = []
+                    #for param in model.parameters():
+                        #print(param.name)
+                        #if param.name == "yolov3/Yolov3_0/DarkNet53_conv_body_0/ConvBNLayer_0/Conv2D_0.w_0":
+                        #if param.name.endswith("w_1") or param.name.endswith("w_2"):
+                        #    pass
+                        #else:
+                        #    dy_gradient.append(param.numpy())
+                        #    dy_param_name.append(param.name)
+                    print("dy loss:", loss.numpy())
+
+                    opt.minimize(loss)
+
+                    model.clear_gradients()
+
+
+
             print("st loss:",loss_data)
 
 
     unittest.main()
-

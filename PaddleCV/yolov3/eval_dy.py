@@ -46,7 +46,7 @@ def eval():
     place = fluid.CUDAPlace(0) if cfg.use_gpu else fluid.CPUPlace()
     with fluid.dygraph.guard(place):
 
-        model = Yolov3("yolov3",is_train=False)
+        model = Yolov3("yolov3",3,is_train=False)
 
 
         # yapf: disable
@@ -97,26 +97,19 @@ def eval():
 
             batch_outputs = model(img, None, None, None, im_id, im_shape)
 
-            #print("lod:",len(batch_outputs.numpy()))
             #lod = batch_outputs[0].lod()[0]
             #lod = len(batch_outputs.numpy())
             nmsed_boxes = batch_outputs.numpy()
-            #print("shape:",nmsed_boxes.shape)
             if nmsed_boxes.shape[1] != 6:
                 continue
-            #print(nmsed_boxes)
-            #print(nmsed_boxes.shape)
             #for i in range(nmsed_boxes.shape[0]):
             for i in range(1):
                 im_id = data[0][1]
-                #print("im_id:",im_id)
-                #print(nmsed_box)
                 nmsed_box=nmsed_boxes
                 labels = nmsed_box[:, 0]
                 scores = nmsed_box[:, 1]
                 boxes = nmsed_box[:, 2:6]
                 dts_res += get_pred_result(boxes, scores, labels, im_id)
-                #pre_id = im_id
             #print(dts_res)
             end_time = time.time()
             print("batch id: {}, time: {}".format(iter_id, end_time - start_time))

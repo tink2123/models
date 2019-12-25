@@ -21,7 +21,7 @@ from paddle.fluid.dygraph.base import to_variable
 
 class ConvBNLayer(fluid.dygraph.Layer):
     def __init__(self,
-                 name_scope,
+                 ch_in,
                  ch_out,
                  filter_size=3,
                  stride=1,
@@ -29,10 +29,10 @@ class ConvBNLayer(fluid.dygraph.Layer):
                  padding=0,
                  act="leaky",
                  is_test=True):
-        super(ConvBNLayer, self).__init__(name_scope)
+        super(ConvBNLayer, self).__init__()
 
         self.conv = Conv2D(
-            self.full_name(),
+            num_channels=ch_in,
             num_filters=ch_out,
             filter_size=filter_size,
             stride=stride,
@@ -42,9 +42,7 @@ class ConvBNLayer(fluid.dygraph.Layer):
                 initializer=fluid.initializer.Normal(0., 0.02)),
             bias_attr=False,
             act=None)
-
         self.batch_norm = BatchNorm(
-            self.full_name(),
             num_channels=ch_out,
             is_test=is_test,
             param_attr=ParamAttr(
@@ -65,17 +63,17 @@ class ConvBNLayer(fluid.dygraph.Layer):
 
 class DownSample(fluid.dygraph.Layer):
     def __init__(self,
-                 name_scope,
+                 ch_in,
                  ch_out,
                  filter_size=3,
                  stride=2,
                  padding=1,
                  is_test=True):
 
-        super(DownSample, self).__init__(name_scope)
+        super(DownSample, self).__init__()
 
         self.conv_bn_layer = ConvBNLayer(
-            self.full_name(),
+            ch_in=ch_in,
             ch_out=ch_out,
             filter_size=filter_size,
             stride=stride,
@@ -87,11 +85,11 @@ class DownSample(fluid.dygraph.Layer):
         return out
 
 class BasicBlock(fluid.dygraph.Layer):
-    def __init__(self, name_scope, ch_out, is_test=True):
-        super(BasicBlock, self).__init__(name_scope)
+    def __init__(self, ch_in, ch_out, is_test=True):
+        super(BasicBlock, self).__init__()
 
         self.conv1 = ConvBNLayer(
-            self.full_name(),
+            ch_in=ch_in,
             ch_out=ch_out,
             filter_size=1,
             stride=1,
@@ -99,7 +97,7 @@ class BasicBlock(fluid.dygraph.Layer):
             is_test=is_test
             )
         self.conv2 = ConvBNLayer(
-            self.full_name(),
+            ch_in=ch_out,
             ch_out=ch_out*2,
             filter_size=3,
             stride=1,
@@ -113,20 +111,21 @@ class BasicBlock(fluid.dygraph.Layer):
         return out
 
 class LayerWarp(fluid.dygraph.Layer):
-    def __init__(self, name_scope, ch_out, count, is_test=True):
-        super(LayerWarp,self).__init__(name_scope)
+    def __init__(self, ch_in, ch_out, count, is_test=True):
+        super(LayerWarp,self).__init__()
 
-        self.basicblock0 = BasicBlock(self.full_name(),
+        self.basicblock0 = BasicBlock(ch_in,
             ch_out,
             is_test=is_test)
         self.res_out_list = []
         for i in range(1,count):
             res_out = self.add_sublayer("basic_block_%d" % (i),
-                BasicBlock(self.full_name(),
+                BasicBlock(
+                    ch_out*2,
                     ch_out,
                     is_test=is_test))
             self.res_out_list.append(res_out)
-
+        self.ch_out = ch_out
     def forward(self,inputs):
         y = self.basicblock0(inputs)
         for basic_block_i in self.res_out_list:
@@ -140,13 +139,14 @@ DarkNet_cfg = {53: ([1, 2, 8, 8, 4])}
 class DarkNet53_conv_body(fluid.dygraph.Layer):
     def __init__(self,
                  name_scope,
+                 ch_in=3,
                  is_test=True):
         super(DarkNet53_conv_body, self).__init__(name_scope)
         self.stages = DarkNet_cfg[53]
         self.stages = self.stages[0:5]
 
         self.conv0 = ConvBNLayer(
-            self.full_name(),
+            ch_in=ch_in,
             ch_out=32,
             filter_size=3,
             stride=1,
@@ -154,17 +154,17 @@ class DarkNet53_conv_body(fluid.dygraph.Layer):
             is_test=is_test)
 
         self.downsample0 = DownSample(
-            self.full_name(),
+            ch_in=32,
             ch_out=32 * 2,
             is_test=is_test)
-
         self.darknet53_conv_block_list = []
         self.downsample_list = []
-
+        ch_in = [64,128,256,512,1024]
         for i, stage in enumerate(self.stages):
             conv_block = self.add_sublayer(
                 "stage_%d" % (i),
-                LayerWarp(self.full_name(),
+                LayerWarp(
+                int(ch_in[i]),
                 32*(2**i),
                 stage,
                 is_test=is_test))
@@ -172,14 +172,14 @@ class DarkNet53_conv_body(fluid.dygraph.Layer):
         for i in range(len(self.stages) - 1):
             downsample = self.add_sublayer(
                 "stage_%d_downsample" % i,
-                DownSample(self.full_name(),
+                DownSample(
+                    ch_in = 32*(2**(i+1)),
                     ch_out = 32*(2**(i+2)),
                     is_test=is_test))
             self.downsample_list.append(downsample)
-
     def forward(self,inputs):
+        
         out = self.conv0(inputs)
-        #print("conv1:",out.numpy())
         out = self.downsample0(out)
         #print("dy:",out.numpy())
         blocks = []
@@ -196,7 +196,6 @@ if __name__ == "__main__":
     import unittest
 
     import paddle.fluid as fluid
-    from test_imperative_base import new_program_scope
 
     class TestDygraphGAN(unittest.TestCase):
         def test(self):
@@ -206,53 +205,58 @@ if __name__ == "__main__":
             main.random_seed = 10
             scope = fluid.core.Scope()
 
-            with fluid.scope_guard(scope):
-                fluid.default_startup_program().random_seed = 10
-                fluid.default_main_program().random_seed = 10
-
-                xyz = fluid.layers.data(name='xyz', shape=[3, 256, 256], dtype='float32')
-                out = darknet.add_DarkNet53_conv_body(xyz)
-                place = fluid.CPUPlace()
-                exe = fluid.Executor(place)
-                exe.run(fluid.default_startup_program())
-                #for param in fluid.default_startup_program().global_block().all_parameters():
-                #    print (param.name)
-
-                np.random.seed(1333)
-                xyz_np = np.random.random((1, 3, 256, 256)).astype('float32')
-                xyz_feats_np = np.random.random((1, 1)).astype('float32')
-                # print("xyz: ", xyz_np.shape, xyz_np)
-                # print("xyz_feats: ", xyz_feats_np.shape, xyz_feats_np)
-                param_list = ["yolo_input.bn.scale"]
-                ret = exe.run(fetch_list=param_list+[out[0]], feed={'xyz': xyz_np})
-                pram = ret[0]
-                sta_out = ret[-1]
-
-            with fluid.dygraph.guard():
+            place=fluid.CUDAPlace(0)
+            with fluid.dygraph.guard(place):
                 fluid.default_startup_program().random_seed = 10
                 fluid.default_main_program().random_seed = 10
                 dy_param_init_value = {}
-                model = DarkNet53_conv_body("darknet53")
-                for param in model.parameters():
-                    #print(param.name)
-                    dy_param_init_value[param.name] = param.numpy()
-
                 np.random.seed(1333)
+                data_np = np.random.random((1, 3, 256, 256)).astype('float32')
+                model = DarkNet53_conv_body("darknet53",is_test=False)
+                for param in model.parameters():
+                    print(param.name)
+                    dy_param_init_value[param.name] = param.numpy()
+                    if param.name == "conv2d_0.w_0":
+                        dy_param = param.numpy()
 
-                #data_np = np.random.random((1, 3, 256, 256)).astype('float32')
-
-                data = to_variable(xyz_np)
-
-                out = model(data)
-                for i, block in enumerate(out):
+                data = to_variable(data_np)
+                dy_out = model(data)
+                for i, block in enumerate(dy_out):
                     print i
                     print (np.sum(block.numpy()))
 
                 #print("st out: ", np.sum(np.abs(sta_out)))
                 #print("dy out:", np.sum(np.abs(out[0].numpy())))
 
-            self.assertTrue(np.allclose(sta_out, out[0].numpy()))
+            #self.assertTrue(np.allclose(sta_out, out[0].numpy()))
 
+            with fluid.scope_guard(scope):
+                fluid.default_startup_program().random_seed = 10
+                fluid.default_main_program().random_seed = 10
 
+                xyz = fluid.layers.data(name='xyz', shape=[3, 256, 256], dtype='float32')
+                out = darknet.add_DarkNet53_conv_body(xyz,is_test=False)
+                #place = fluid.CPUPlace()
+                place = fluid.CUDAPlace(0)
+                exe = fluid.Executor(place)
+                exe.run(fluid.default_startup_program())
+                st_param_init_value=[]
+                for param in fluid.default_startup_program().global_block().all_parameters():
+                #    print(param.name)
+                #    print (param.shape)
+                    st_param_init_value.append(param.name)
+
+                # print("xyz: ", xyz_np.shape, xyz_np)
+                param_list = ["leaky_relu_0.tmp_0"]
+                param_list = [str(st_param_init_value[0])]
+                ret = exe.run(fetch_list=param_list+[out[0]], feed={'xyz': data_np})
+                pram = ret[0]
+                sta_out = ret[-1]
+                print("st_input:",np.sum(data_np))
+                print("st_conv_weights:",np.sum(pram),pram.shape)
+                print("dy_conv_weights:",np.sum(dy_param))
+
+                print("st out: ", np.sum(np.abs(sta_out)))
+                print("dy out:", np.sum(np.abs(dy_out[0].numpy())))
     unittest.main()
 
