@@ -120,6 +120,7 @@ class BlazeFace(object):
 
         for i, input in enumerate(inputs):
             min_size = self.min_sizes[i]
+            print("min_size:",min_size)
 
             if use_density_prior_box:
                 densities = self.densities[i]

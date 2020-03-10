@@ -88,7 +88,8 @@ class MobileNetV3(object):
         conv = self.conv_bn_layer(
             input,
             filter_size=3,
-            num_filters=int(scale * inplanes),
+            #num_filters=int(scale * inplanes),
+            num_filters=inplanes if scale <= 1.0 else int(inplanes * scale), 
             stride=2,
             padding=1,
             num_groups=1,
@@ -192,21 +193,30 @@ class MobileNetV3(object):
                       use_se=False,
                       name=None):
 
-        first_conv = (num_out_filter != num_mid_filter)
+        #first_conv = (num_out_filter != num_mid_filter)
         input_data = input
-        if first_conv:
-            input = self.conv_bn_layer(
-                input=input,
-                filter_size=1,
-                num_filters=num_mid_filter,
-                stride=1,
-                padding=0,
-                if_act=True,
-                act=act,
-                name=name + '_expand')
+        #if first_conv:
+        #    input = self.conv_bn_layer(
+        #        input=input,
+        #        filter_size=1,
+        #        num_filters=num_mid_filter,
+        #        stride=1,
+        #        padding=0,
+        #        if_act=True,
+        #        act=act,
+        #        name=name + '_expand')
+
+        conv0 = self.conv_bn_layer(input=input,
+                                   filter_size=1,
+                                   num_filters=num_mid_filter,
+                                   stride=1,
+                                   padding=0,
+                                   if_act=True,
+                                   act=act,
+                                   name=name + '_expand')
 
         conv1 = self.conv_bn_layer(
-            input=input,
+            input=conv0,
             filter_size=filter_size,
             num_filters=num_mid_filter,
             stride=stride,
